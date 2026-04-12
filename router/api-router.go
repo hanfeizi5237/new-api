@@ -160,6 +160,52 @@ func SetApiRouter(router *gin.Engine) {
 			subscriptionAdminRoute.DELETE("/user_subscriptions/:id", controller.AdminDeleteUserSubscription)
 		}
 
+		sellerAdminRoute := apiRouter.Group("/seller/admin")
+		sellerAdminRoute.Use(middleware.AdminAuth())
+		{
+			sellerAdminRoute.GET("", controller.GetSellerAdmin)
+			sellerAdminRoute.POST("", controller.CreateSellerAdmin)
+			sellerAdminRoute.PUT("/:id/status", controller.UpdateSellerAdminStatus)
+		}
+
+		marketplaceAdminRoute := apiRouter.Group("/marketplace/admin")
+		marketplaceAdminRoute.Use(middleware.AdminAuth())
+		{
+			marketplaceAdminRoute.GET("/seller-secrets", controller.GetSellerSecretsAdmin)
+			marketplaceAdminRoute.POST("/seller-secrets", controller.CreateSellerSecretAdmin)
+			marketplaceAdminRoute.POST("/seller-secrets/:id/verify", controller.VerifySellerSecretAdmin)
+			marketplaceAdminRoute.POST("/seller-secrets/:id/disable", controller.DisableSellerSecretAdmin)
+			marketplaceAdminRoute.POST("/seller-secrets/:id/recover", controller.RecoverSellerSecretAdmin)
+		}
+
+		listingAdminRoute := apiRouter.Group("/listing/admin")
+		listingAdminRoute.Use(middleware.AdminAuth())
+		{
+			listingAdminRoute.GET("", controller.GetListingAdmin)
+			listingAdminRoute.POST("", controller.CreateListingAdmin)
+			listingAdminRoute.PUT("/:id/status", controller.UpdateListingAdminStatus)
+		}
+
+		marketRoute := apiRouter.Group("/market")
+		{
+			marketRoute.GET("/listings", controller.GetMarketListings)
+			marketRoute.GET("/listings/:id", controller.GetMarketListing)
+		}
+		marketSelfRoute := marketRoute.Group("/")
+		marketSelfRoute.Use(middleware.UserAuth())
+		{
+			marketSelfRoute.POST("/orders", controller.CreateMarketOrder)
+			marketSelfRoute.GET("/orders", controller.GetMarketOrders)
+			marketSelfRoute.GET("/orders/:id", controller.GetMarketOrder)
+			marketSelfRoute.POST("/orders/:id/pay", controller.PayMarketOrder)
+			marketSelfRoute.GET("/entitlements", controller.GetMarketEntitlements)
+		}
+		apiRouter.POST("/market/payment/epay/notify", controller.MarketEpayNotify)
+		apiRouter.GET("/market/payment/epay/notify", controller.MarketEpayNotify)
+		apiRouter.POST("/market/payment/stripe/webhook", controller.MarketStripeWebhook)
+		apiRouter.POST("/market/payment/creem/webhook", controller.MarketCreemWebhook)
+		apiRouter.POST("/market/payment/waffo/webhook", controller.MarketWaffoWebhook)
+
 		// Subscription payment callbacks (no auth)
 		apiRouter.POST("/subscription/epay/notify", controller.SubscriptionEpayNotify)
 		apiRouter.GET("/subscription/epay/notify", controller.SubscriptionEpayNotify)
