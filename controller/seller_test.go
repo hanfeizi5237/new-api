@@ -23,6 +23,10 @@ type sellerPageResponse struct {
 func TestSellerAdminCreateListAndUpdateStatus(t *testing.T) {
 	db := setupMarketplaceControllerTestDB(t)
 	user := seedMarketplaceUser(t, db, "seller-admin-user")
+	vendor := &model.Vendor{Name: "seller-admin-vendor", Status: 1}
+	if err := db.Create(vendor).Error; err != nil {
+		t.Fatalf("failed to create vendor: %v", err)
+	}
 
 	createBody := CreateSellerAdminRequest{
 		Seller: model.SellerProfile{
@@ -34,6 +38,7 @@ func TestSellerAdminCreateListAndUpdateStatus(t *testing.T) {
 		SupplyAccount: model.SupplyAccount{
 			SupplyCode:       "supply-admin-001",
 			ProviderCode:     "openai",
+			VendorId:         vendor.Id,
 			ModelName:        "gpt-4o-mini",
 			QuotaUnit:        "token",
 			TotalCapacity:    120000,

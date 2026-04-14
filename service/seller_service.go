@@ -35,6 +35,9 @@ func CreateSellerWithSupply(input CreateSellerInput) (*model.SellerProfile, *mod
 	if strings.TrimSpace(input.SupplyAccount.ProviderCode) == "" {
 		return nil, nil, errors.New("supply_account.provider_code is required")
 	}
+	if input.SupplyAccount.VendorId <= 0 {
+		return nil, nil, errors.New("supply_account.vendor_id is required")
+	}
 	if strings.TrimSpace(input.SupplyAccount.ModelName) == "" {
 		return nil, nil, errors.New("supply_account.model_name is required")
 	}
@@ -46,6 +49,13 @@ func CreateSellerWithSupply(input CreateSellerInput) (*model.SellerProfile, *mod
 	}
 	if _, err := model.GetUserById(input.Seller.UserId, true); err != nil {
 		return nil, nil, err
+	}
+	vendor, err := model.GetVendorByID(input.SupplyAccount.VendorId)
+	if err != nil {
+		return nil, nil, err
+	}
+	if vendor.Status != 1 {
+		return nil, nil, errors.New("supply_account vendor is not active")
 	}
 
 	seller := input.Seller
@@ -70,7 +80,7 @@ func CreateSellerWithSupply(input CreateSellerInput) (*model.SellerProfile, *mod
 		}
 	}
 
-	err := model.DB.Transaction(func(tx *gorm.DB) error {
+	err = model.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&seller).Error; err != nil {
 			return err
 		}

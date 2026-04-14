@@ -101,6 +101,7 @@ func CreateSellerSecret(input CreateSellerSecretInput, actorUserId int, reason s
 		return nil, err
 	}
 	recordSellerSecretOperationLog(actorUserId, createdSecret, "import", "success", reason)
+	syncMarketplaceInventoryAfterMutation(createdSecret.SupplyAccountId, "seller_secret_created")
 	return secret, nil
 }
 
@@ -140,6 +141,7 @@ func DisableSellerSecret(id int, actorUserId int, reason string) (*model.SellerS
 		return nil, err
 	}
 	recordSellerSecretOperationLog(actorUserId, secret, "disable", "success", reason)
+	syncMarketplaceInventoryAfterMutation(secret.SupplyAccountId, "seller_secret_disabled")
 	return model.GetSellerSecretByID(id)
 }
 
@@ -178,6 +180,7 @@ func RecoverSellerSecret(id int, actorUserId int, reason string) (*model.SellerS
 		return nil, err
 	}
 	recordSellerSecretOperationLog(actorUserId, secret, "recover", "success", reason)
+	syncMarketplaceInventoryAfterMutation(secret.SupplyAccountId, "seller_secret_recovered")
 	return model.GetSellerSecretByID(id)
 }
 

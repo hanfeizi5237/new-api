@@ -43,7 +43,7 @@ func (s *BillingSession) Settle(actualQuota int) error {
 		return nil
 	}
 	delta := actualQuota - s.preConsumedQuota
-	if delta == 0 {
+	if delta == 0 && s.funding.Source() != BillingSourceMarketplaceEntitlement {
 		s.settled = true
 		return nil
 	}
@@ -56,7 +56,7 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	}
 	// 2) 调整令牌额度
 	var tokenErr error
-	if !s.relayInfo.IsPlayground {
+	if s.funding.Source() != BillingSourceMarketplaceEntitlement && !s.relayInfo.IsPlayground {
 		if delta > 0 {
 			tokenErr = model.DecreaseTokenQuota(s.relayInfo.TokenId, s.relayInfo.TokenKey, delta)
 		} else {
@@ -126,6 +126,9 @@ func (s *BillingSession) needsRefundLocked() bool {
 		return false
 	}
 	if s.tokenConsumed > 0 {
+		return true
+	}
+	if s.funding.Source() == BillingSourceMarketplaceEntitlement && s.preConsumedQuota > 0 {
 		return true
 	}
 	// 订阅可能在 tokenConsumed=0 时仍预扣了额度
@@ -233,6 +236,19 @@ func (s *BillingSession) syncRelayInfo() {
 	info.FinalPreConsumedQuota = s.preConsumedQuota
 	info.BillingSource = s.funding.Source()
 
+	if marketplaceFunding, ok := s.funding.(*MarketplaceEntitlementFunding); ok {
+		info.EntitlementLotId = marketplaceFunding.entitlementLotId
+		info.SellerId = marketplaceFunding.sellerId
+		info.SupplyAccountId = marketplaceFunding.supplyAccountId
+		info.ListingId = marketplaceFunding.listingId
+		info.OrderId = marketplaceFunding.orderId
+		info.OrderItemId = marketplaceFunding.orderItemId
+		info.EntitlementChannelIDs = append([]int(nil), marketplaceFunding.channelIDs...)
+		info.SubscriptionId = 0
+		info.SubscriptionPreConsumed = 0
+		return
+	}
+
 	if sub, ok := s.funding.(*SubscriptionFunding); ok {
 		info.SubscriptionId = sub.subscriptionId
 		info.SubscriptionPreConsumed = sub.preConsumed
@@ -255,6 +271,10 @@ func (s *BillingSession) syncRelayInfo() {
 func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preConsumedQuota int) (*BillingSession, *types.NewAPIError) {
 	if relayInfo == nil {
 		return nil, types.NewError(fmt.Errorf("relayInfo is nil"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+	}
+
+	if session, apiErr, handled := resolveMarketplaceEntitlementBillingSession(relayInfo, preConsumedQuota); handled {
+		return session, apiErr
 	}
 
 	pref := common.NormalizeBillingPreference(relayInfo.UserSetting.BillingPreference)

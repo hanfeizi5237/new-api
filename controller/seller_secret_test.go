@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,6 +25,15 @@ func TestSellerSecretAdminCreateListAndVerifyMaskCiphertext(t *testing.T) {
 	_, _ = seedMarketplaceChannelBinding(t, db, supply, "old-runtime-key")
 	t.Setenv("SELLER_SECRET_MASTER_KEY", strings.Repeat("k", 32))
 	t.Setenv("SELLER_SECRET_FINGERPRINT_SALT", "seller-secret-salt")
+	service.SetSellerSecretLiveProbeFunc(func(secret *model.SellerSecret, runtimeKey string) error {
+		if runtimeKey == "" {
+			return errors.New("runtime key is empty")
+		}
+		return nil
+	})
+	t.Cleanup(func() {
+		service.SetSellerSecretLiveProbeFunc(marketplaceSellerSecretLiveProbe)
+	})
 
 	createBody := CreateSellerSecretRequest{
 		SellerId:        seller.Id,

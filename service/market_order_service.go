@@ -17,6 +17,7 @@ const (
 
 	marketPaymentStatusUnpaid = "unpaid"
 	marketPaymentStatusPaid   = "paid"
+	marketPaymentStatusFailed = "failed"
 
 	marketEntitlementStatusPending = "pending"
 	marketEntitlementStatusCreated = "created"
@@ -192,6 +193,7 @@ func CreateMarketOrder(input CreateMarketOrderInput) (*model.MarketOrder, []mode
 	}); err != nil {
 		return nil, nil, err
 	}
+	syncMarketplaceInventoryAfterMutation(supply.Id, "order_created")
 
 	return &order, []model.MarketOrderItem{orderItem}, nil
 }
@@ -289,7 +291,23 @@ func closeMarketOrder(orderID int, now int64, reason string) (bool, error) {
 		closed = true
 		return nil
 	})
+	if err == nil && closed {
+		order, getErr := model.GetMarketOrderByID(orderID)
+		if getErr == nil {
+			syncMarketplaceInventoryAfterMutation(orderItemsSupplyAccountID(orderID), reason)
+		} else {
+			_ = order
+		}
+	}
 	return closed, err
+}
+
+func orderItemsSupplyAccountID(orderID int) int {
+	items, err := model.GetMarketOrderItemsByOrderID(orderID)
+	if err != nil || len(items) == 0 {
+		return 0
+	}
+	return items[0].SupplyAccountId
 }
 
 func loadMarketOrderItemsTx(tx *gorm.DB, orderID int) ([]model.MarketOrderItem, error) {

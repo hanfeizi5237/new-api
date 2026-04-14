@@ -197,7 +197,7 @@ func SetApiRouter(router *gin.Engine) {
 			marketSelfRoute.POST("/orders", controller.CreateMarketOrder)
 			marketSelfRoute.GET("/orders", controller.GetMarketOrders)
 			marketSelfRoute.GET("/orders/:id", controller.GetMarketOrder)
-			marketSelfRoute.POST("/orders/:id/pay", controller.PayMarketOrder)
+			marketSelfRoute.POST("/orders/:id/pay", middleware.CriticalRateLimit(), controller.PayMarketOrder)
 			marketSelfRoute.GET("/entitlements", controller.GetMarketEntitlements)
 		}
 		apiRouter.POST("/market/payment/epay/notify", controller.MarketEpayNotify)

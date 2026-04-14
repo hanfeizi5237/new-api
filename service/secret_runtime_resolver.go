@@ -33,6 +33,8 @@ type supplySecretState struct {
 	LatestVerifiedAt int64
 }
 
+var sellerSecretLiveProbeFunc = probeSellerSecretProviderLive
+
 func getSellerSecretMasterKey() ([]byte, error) {
 	masterKey := strings.TrimSpace(os.Getenv("SELLER_SECRET_MASTER_KEY"))
 	if masterKey == "" {
@@ -246,14 +248,43 @@ func getActiveSupplyBindingsTx(tx *gorm.DB, supplyAccountId int) ([]model.Supply
 	return bindings, nil
 }
 
-func listSecretActivationBlockersTx(tx *gorm.DB, supplyAccountId int, excludeSecretId int) ([]model.SellerSecret, error) {
-	var blockers []model.SellerSecret
-	if err := tx.Where("supply_account_id = ? AND id <> ? AND status IN ?", supplyAccountId, excludeSecretId, []string{"active", "rotating"}).
+func prepareSellerSecretActivationTx(tx *gorm.DB, supplyAccountId int, candidateSecretId int) error {
+	var existing []model.SellerSecret
+	if err := tx.Where("supply_account_id = ? AND id <> ? AND status IN ?", supplyAccountId, candidateSecretId, []string{"active", "rotating"}).
 		Order("id asc").
-		Find(&blockers).Error; err != nil {
-		return nil, err
+		Find(&existing).Error; err != nil {
+		return err
 	}
-	return blockers, nil
+
+	activeSecrets := make([]model.SellerSecret, 0, 1)
+	rotatingSecrets := make([]model.SellerSecret, 0, 1)
+	for _, secret := range existing {
+		switch secret.Status {
+		case "active":
+			activeSecrets = append(activeSecrets, secret)
+		case "rotating":
+			rotatingSecrets = append(rotatingSecrets, secret)
+		}
+	}
+
+	if len(activeSecrets) > 1 || len(rotatingSecrets) > 1 {
+		return fmt.Errorf("seller secret state is invalid for supply %d", supplyAccountId)
+	}
+	if len(activeSecrets) == 1 && len(rotatingSecrets) == 1 {
+		return fmt.Errorf("seller secret rotation window already occupied for supply %d", supplyAccountId)
+	}
+	if len(activeSecrets) == 1 {
+		now := common.GetTimestamp()
+		if err := tx.Model(&model.SellerSecret{}).
+			Where("id = ?", activeSecrets[0].Id).
+			Updates(map[string]interface{}{
+				"status":     "rotating",
+				"updated_at": now,
+			}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func syncSellerSecretRuntimeMirrorTx(tx *gorm.DB, secret *model.SellerSecret, runtimeKey string) ([]int, error) {

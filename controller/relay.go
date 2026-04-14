@@ -284,6 +284,18 @@ func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
 }
 
 func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service.RetryParam) (*model.Channel, *types.NewAPIError) {
+	if info.BillingSource == service.BillingSourceMarketplaceEntitlement {
+		channel, err := service.GetMarketplaceEntitlementChannel(info, retryParam.GetRetry())
+		info.PriceData.GroupRatioInfo = helper.HandleGroupRatio(c, info)
+		if err != nil {
+			return nil, types.NewError(fmt.Errorf("获取 marketplace entitlement 渠道失败: %s", err.Error()), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+		}
+		newAPIError := middleware.SetupContextForSelectedChannel(c, channel, info.OriginModelName)
+		if newAPIError != nil {
+			return nil, newAPIError
+		}
+		return channel, nil
+	}
 	if info.ChannelMeta == nil {
 		autoBan := c.GetBool("auto_ban")
 		autoBanInt := 1

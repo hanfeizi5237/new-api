@@ -209,8 +209,7 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, "+
 			"tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, modelName, relayInfo.FinalPreConsumedQuota))
 	} else {
-		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
-		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
+		recordQuotaUsage(relayInfo, quota)
 	}
 
 	logModel := modelName
@@ -310,8 +309,7 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, "+
 			"tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, relayInfo.OriginModelName, relayInfo.FinalPreConsumedQuota))
 	} else {
-		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
-		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
+		recordQuotaUsage(relayInfo, quota)
 	}
 
 	if err := SettleBilling(ctx, relayInfo, quota); err != nil {
@@ -504,4 +502,17 @@ func checkAndSendSubscriptionQuotaNotify(relayInfo *relaycommon.RelayInfo) {
 			common.SysError(fmt.Sprintf("failed to send subscription quota notify to user %d: %s", relayInfo.UserId, err.Error()))
 		}
 	})
+}
+
+func recordQuotaUsage(relayInfo *relaycommon.RelayInfo, quota int) {
+	if relayInfo == nil {
+		return
+	}
+	if relayInfo.BillingSource == BillingSourceMarketplaceEntitlement {
+		// Marketplace-funded requests still count as requests but must not inflate wallet used_quota.
+		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, 0)
+	} else {
+		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
+	}
+	model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 }

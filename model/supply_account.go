@@ -1,6 +1,8 @@
 package model
 
 import (
+	"errors"
+
 	"github.com/QuantumNous/new-api/common"
 	"gorm.io/gorm"
 )
@@ -28,6 +30,9 @@ type SupplyAccount struct {
 }
 
 func (s *SupplyAccount) BeforeCreate(tx *gorm.DB) error {
+	if s.VendorId <= 0 {
+		return errors.New("vendor_id is required")
+	}
 	setMarketplaceTimestampsOnCreate(&s.CreatedAt, &s.UpdatedAt)
 	return nil
 }

@@ -131,6 +131,14 @@ type RelayInfo struct {
 	BillingSource string
 	// SubscriptionId is the user_subscriptions.id used when BillingSource == "subscription"
 	SubscriptionId int
+	// Marketplace entitlement metadata for marketplace-funded requests.
+	EntitlementLotId      int
+	SellerId              int
+	SupplyAccountId       int
+	ListingId             int
+	OrderId               int
+	OrderItemId           int
+	EntitlementChannelIDs []int
 	// SubscriptionPreConsumed is the amount pre-consumed on subscription item (quota units or 1)
 	SubscriptionPreConsumed int64
 	// SubscriptionPostDelta is the post-consume delta applied to amount_used (quota units; can be negative).

@@ -27,12 +27,8 @@ func VerifySellerSecret(id int, actorUserId int) (*model.SellerSecret, error) {
 			return recomputeSupplyAccountSecretStateTx(tx, secret.SupplyAccountId)
 		}
 
-		blockers, err := listSecretActivationBlockersTx(tx, secret.SupplyAccountId, secret.Id)
-		if err != nil {
-			return err
-		}
-		if len(blockers) > 0 {
-			verifyErr = fmt.Errorf("another active or rotating seller secret already exists on supply %d", secret.SupplyAccountId)
+		if err := prepareSellerSecretActivationTx(tx, secret.SupplyAccountId, secret.Id); err != nil {
+			verifyErr = err
 			if err := markSellerSecretVerificationFailureTx(tx, secret, actorUserId, verifyErr.Error()); err != nil {
 				return err
 			}
@@ -40,6 +36,13 @@ func VerifySellerSecret(id int, actorUserId int) (*model.SellerSecret, error) {
 		}
 
 		if err := probeSellerSecretBindingsTx(tx, secret); err != nil {
+			verifyErr = err
+			if err := markSellerSecretVerificationFailureTx(tx, secret, actorUserId, verifyErr.Error()); err != nil {
+				return err
+			}
+			return recomputeSupplyAccountSecretStateTx(tx, secret.SupplyAccountId)
+		}
+		if err := sellerSecretLiveProbeFunc(secret, runtimeKey); err != nil {
 			verifyErr = err
 			if err := markSellerSecretVerificationFailureTx(tx, secret, actorUserId, verifyErr.Error()); err != nil {
 				return err
@@ -110,6 +113,7 @@ func VerifySellerSecret(id int, actorUserId int) (*model.SellerSecret, error) {
 		recordSellerSecretOperationLog(actorUserId, updated, "verify", "success", "runtime mirror sync completed")
 		recordSellerSecretOperationLog(actorUserId, updated, "sync_channel", "success", fmt.Sprintf("channels=%v", syncedChannelIds))
 		refreshChannelCache(syncedChannelIds)
+		syncMarketplaceInventoryAfterMutation(updated.SupplyAccountId, "seller_secret_verified")
 		return updated, nil
 	}
 	verifyLogResult = "failed"
@@ -118,5 +122,6 @@ func VerifySellerSecret(id int, actorUserId int) (*model.SellerSecret, error) {
 	if strings.TrimSpace(updated.VerifyMessage) == "" {
 		updated.VerifyMessage = verifyErr.Error()
 	}
+	syncMarketplaceInventoryAfterMutation(updated.SupplyAccountId, "seller_secret_verify_failed")
 	return updated, verifyErr
 }

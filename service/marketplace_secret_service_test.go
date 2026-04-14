@@ -43,7 +43,9 @@ func setupMarketplaceServiceTestDB(t *testing.T) *gorm.DB {
 
 	if err := db.AutoMigrate(
 		&model.User{},
+		&model.Vendor{},
 		&model.Channel{},
+		&model.Log{},
 		&model.SellerProfile{},
 		&model.SupplyAccount{},
 		&model.SellerSecret{},
@@ -116,10 +118,18 @@ func seedMarketplaceServiceSupply(t *testing.T, db *gorm.DB, user *model.User, s
 	if err := db.Create(seller).Error; err != nil {
 		t.Fatalf("failed to create seller: %v", err)
 	}
+	vendor := &model.Vendor{
+		Name:   fmt.Sprintf("vendor-%d", user.Id),
+		Status: 1,
+	}
+	if err := db.Create(vendor).Error; err != nil {
+		t.Fatalf("failed to create vendor: %v", err)
+	}
 	supply := &model.SupplyAccount{
 		SellerId:         seller.Id,
 		SupplyCode:       fmt.Sprintf("supply-%d", user.Id),
 		ProviderCode:     "openai",
+		VendorId:         vendor.Id,
 		ModelName:        "gpt-4o-mini",
 		QuotaUnit:        quotaUnit,
 		TotalCapacity:    100000,
@@ -282,7 +292,7 @@ func TestVerifySellerSecretRejectsMalformedCiphertext(t *testing.T) {
 	}
 }
 
-func TestVerifySellerSecretRejectsSecondActiveSecretOnSameSupply(t *testing.T) {
+func TestVerifySellerSecretPromotesNewSecretAndRotatesOldSecret(t *testing.T) {
 	db := setupMarketplaceServiceTestDB(t)
 	user := seedMarketplaceServiceUser(t, db, "svc-secret-second-active")
 	seller, supply := seedMarketplaceServiceSupply(t, db, user, "active", "success", "token")
@@ -294,8 +304,26 @@ func TestVerifySellerSecretRejectsSecondActiveSecretOnSameSupply(t *testing.T) {
 	candidatePayload := makeSellerSecretCiphertext(t, strings.Repeat("s", 32), "sk-live-new", "v1")
 	candidate := seedSellerSecretRecord(t, db, seller.Id, supply.Id, candidatePayload, "fp-new", "draft", "pending")
 
-	if _, err := VerifySellerSecret(candidate.Id, user.Id); err == nil {
-		t.Fatalf("expected verify to reject a second active secret on the same supply")
+	verified, err := VerifySellerSecret(candidate.Id, user.Id)
+	if err != nil {
+		t.Fatalf("expected verify to promote candidate secret, got error: %v", err)
+	}
+	if verified.Status != "active" || verified.VerifyStatus != "success" {
+		t.Fatalf("expected candidate secret active/success, got %+v", verified)
+	}
+
+	var reloaded []model.SellerSecret
+	if err := db.Where("supply_account_id = ?", supply.Id).Order("id asc").Find(&reloaded).Error; err != nil {
+		t.Fatalf("failed to reload secrets: %v", err)
+	}
+	if len(reloaded) != 2 {
+		t.Fatalf("expected two secrets after rotation verify, got %d", len(reloaded))
+	}
+	if reloaded[0].Status != "rotating" {
+		t.Fatalf("expected old secret to become rotating, got %+v", reloaded[0])
+	}
+	if reloaded[1].Status != "active" {
+		t.Fatalf("expected new secret to become active, got %+v", reloaded[1])
 	}
 
 	var activeCount int64
@@ -304,6 +332,14 @@ func TestVerifySellerSecretRejectsSecondActiveSecretOnSameSupply(t *testing.T) {
 	}
 	if activeCount != 1 {
 		t.Fatalf("expected exactly one active secret, got %d", activeCount)
+	}
+
+	var rotatingCount int64
+	if err := db.Model(&model.SellerSecret{}).Where("supply_account_id = ? AND status = ?", supply.Id, "rotating").Count(&rotatingCount).Error; err != nil {
+		t.Fatalf("failed to count rotating secrets: %v", err)
+	}
+	if rotatingCount != 1 {
+		t.Fatalf("expected exactly one rotating secret, got %d", rotatingCount)
 	}
 }
 
@@ -369,5 +405,44 @@ func TestVerifySellerSecretSyncsRuntimeChannelMirror(t *testing.T) {
 	otherInfo := reloadedChannel.GetOtherInfo()
 	if otherInfo["managed_by"] != "seller_secret" {
 		t.Fatalf("expected channel managed_by seller_secret, got %+v", otherInfo)
+	}
+}
+
+func TestVerifySellerSecretUsesProviderProbeBeforeActivation(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+	user := seedMarketplaceServiceUser(t, db, "svc-secret-provider-probe")
+	seller, supply := seedMarketplaceServiceSupply(t, db, user, "paused", "pending", "token")
+	_, _ = seedMarketplaceChannelBinding(t, db, supply, "old-runtime-key")
+	t.Setenv("SELLER_SECRET_MASTER_KEY", strings.Repeat("p", 32))
+
+	secretPayload := makeSellerSecretCiphertext(t, strings.Repeat("p", 32), "sk-provider-live", "v1")
+	secret := seedSellerSecretRecord(t, db, seller.Id, supply.Id, secretPayload, "fp-probe", "draft", "pending")
+
+	previousProbe := sellerSecretLiveProbeFunc
+	probeCalls := 0
+	sellerSecretLiveProbeFunc = func(secret *model.SellerSecret, runtimeKey string) error {
+		probeCalls++
+		if runtimeKey != "sk-provider-live" {
+			t.Fatalf("expected decrypted runtime key to be probed, got %q", runtimeKey)
+		}
+		return fmt.Errorf("provider probe failed")
+	}
+	t.Cleanup(func() {
+		sellerSecretLiveProbeFunc = previousProbe
+	})
+
+	if _, err := VerifySellerSecret(secret.Id, user.Id); err == nil {
+		t.Fatalf("expected verify to fail when provider probe fails")
+	}
+	if probeCalls != 1 {
+		t.Fatalf("expected provider probe to run exactly once, got %d", probeCalls)
+	}
+
+	updatedSecret, err := model.GetSellerSecretByID(secret.Id)
+	if err != nil {
+		t.Fatalf("failed to reload secret: %v", err)
+	}
+	if updatedSecret.Status == "active" || updatedSecret.VerifyStatus == "success" {
+		t.Fatalf("expected provider probe failure to block activation, got %+v", updatedSecret)
 	}
 }

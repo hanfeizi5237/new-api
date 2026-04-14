@@ -125,7 +125,7 @@ func appendBillingInfo(relayInfo *relaycommon.RelayInfo, other map[string]interf
 	if relayInfo.UserSetting.BillingPreference != "" {
 		other["billing_preference"] = relayInfo.UserSetting.BillingPreference
 	}
-	if relayInfo.BillingSource == "subscription" {
+	if relayInfo.BillingSource == BillingSourceSubscription {
 		if relayInfo.SubscriptionId != 0 {
 			other["subscription_id"] = relayInfo.SubscriptionId
 		}
@@ -164,6 +164,30 @@ func appendBillingInfo(relayInfo *relaycommon.RelayInfo, other map[string]interf
 			other["subscription_consumed"] = consumed
 		}
 		// Wallet quota is not deducted when billed from subscription.
+		other["wallet_quota_deducted"] = 0
+	}
+	if relayInfo.BillingSource == BillingSourceMarketplaceEntitlement {
+		if relayInfo.EntitlementLotId != 0 {
+			other["entitlement_lot_id"] = relayInfo.EntitlementLotId
+		}
+		if relayInfo.SellerId != 0 {
+			other["seller_id"] = relayInfo.SellerId
+		}
+		if relayInfo.SupplyAccountId != 0 {
+			other["supply_account_id"] = relayInfo.SupplyAccountId
+		}
+		if relayInfo.ListingId != 0 {
+			other["listing_id"] = relayInfo.ListingId
+		}
+		if relayInfo.OrderId != 0 {
+			other["order_id"] = relayInfo.OrderId
+		}
+		if relayInfo.OrderItemId != 0 {
+			other["order_item_id"] = relayInfo.OrderItemId
+		}
+		if len(relayInfo.EntitlementChannelIDs) > 0 {
+			other["entitlement_channel_ids"] = append([]int(nil), relayInfo.EntitlementChannelIDs...)
+		}
 		other["wallet_quota_deducted"] = 0
 	}
 }

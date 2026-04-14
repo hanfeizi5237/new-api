@@ -56,6 +56,11 @@ func setupMarketplaceControllerTestDB(t *testing.T) *gorm.DB {
 		&model.Listing{},
 		&model.ListingSKU{},
 		&model.InventorySnapshot{},
+		&model.MarketOrder{},
+		&model.MarketOrderItem{},
+		&model.BuyerEntitlement{},
+		&model.EntitlementLot{},
+		&model.UsageLedger{},
 	); err != nil {
 		t.Fatalf("failed to migrate marketplace admin tables: %v", err)
 	}
@@ -100,11 +105,19 @@ func seedMarketplaceSellerWithSupply(t *testing.T, db *gorm.DB, userId int) (*mo
 	if err := db.Create(seller).Error; err != nil {
 		t.Fatalf("failed to create seller: %v", err)
 	}
+	vendor := &model.Vendor{
+		Name:   fmt.Sprintf("vendor-%d", userId),
+		Status: 1,
+	}
+	if err := db.Create(vendor).Error; err != nil {
+		t.Fatalf("failed to create vendor: %v", err)
+	}
 
 	supply := &model.SupplyAccount{
 		SellerId:         seller.Id,
 		SupplyCode:       fmt.Sprintf("supply-%d", userId),
 		ProviderCode:     "openai",
+		VendorId:         vendor.Id,
 		ModelName:        "gpt-4o-mini",
 		QuotaUnit:        "token",
 		TotalCapacity:    100000,
