@@ -44,6 +44,7 @@ func (m *MarketplaceEntitlementFunding) PreConsume(amount int) error {
 	}
 	return model.DB.Transaction(func(tx *gorm.DB) error {
 		now := common.GetTimestamp()
+		// Lots are ordered by expiry/priority so relay spends the earliest valid entitlement first.
 		lots, err := listCandidateMarketplaceLotsTx(tx, m.userId, m.modelName, now)
 		if err != nil {
 			return err
@@ -64,7 +65,7 @@ func (m *MarketplaceEntitlementFunding) PreConsume(amount int) error {
 			}
 
 			var entitlement model.BuyerEntitlement
-			if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&entitlement, lot.BuyerEntitlementId).Error; err != nil {
+			if err := lockForUpdate(tx).First(&entitlement, lot.BuyerEntitlementId).Error; err != nil {
 				return err
 			}
 			if err := tx.Model(&model.EntitlementLot{}).
@@ -120,15 +121,15 @@ func (m *MarketplaceEntitlementFunding) Settle(delta int) error {
 	}
 	return model.DB.Transaction(func(tx *gorm.DB) error {
 		var lot model.EntitlementLot
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&lot, m.entitlementLotId).Error; err != nil {
+		if err := lockForUpdate(tx).First(&lot, m.entitlementLotId).Error; err != nil {
 			return err
 		}
 		var entitlement model.BuyerEntitlement
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&entitlement, lot.BuyerEntitlementId).Error; err != nil {
+		if err := lockForUpdate(tx).First(&entitlement, lot.BuyerEntitlementId).Error; err != nil {
 			return err
 		}
 		var supply model.SupplyAccount
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&supply, m.supplyAccountId).Error; err != nil {
+		if err := lockForUpdate(tx).First(&supply, m.supplyAccountId).Error; err != nil {
 			return err
 		}
 		snapshot, err := loadOrCreateInventorySnapshotTx(tx, &supply)
@@ -175,6 +176,7 @@ func (m *MarketplaceEntitlementFunding) Settle(delta int) error {
 		if err := tx.Save(snapshot).Error; err != nil {
 			return err
 		}
+		// Success and refund flows both upsert by event key so webhook retries do not duplicate usage ledgers.
 		return upsertMarketplaceUsageLedgerTx(tx, marketplaceUsageLedgerInput{
 			EventKey:         m.requestId + ":success",
 			RequestID:        m.requestId,
@@ -207,11 +209,11 @@ func (m *MarketplaceEntitlementFunding) Refund() error {
 	}
 	return model.DB.Transaction(func(tx *gorm.DB) error {
 		var lot model.EntitlementLot
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&lot, m.entitlementLotId).Error; err != nil {
+		if err := lockForUpdate(tx).First(&lot, m.entitlementLotId).Error; err != nil {
 			return err
 		}
 		var entitlement model.BuyerEntitlement
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&entitlement, lot.BuyerEntitlementId).Error; err != nil {
+		if err := lockForUpdate(tx).First(&entitlement, lot.BuyerEntitlementId).Error; err != nil {
 			return err
 		}
 		frozenRelease := minInt64(lot.FrozenAmount, int64(m.preConsumed))
@@ -230,6 +232,7 @@ func (m *MarketplaceEntitlementFunding) Refund() error {
 		if m.relayInfo != nil && m.relayInfo.LastError != nil {
 			errorCode = string(m.relayInfo.LastError.GetErrorCode())
 		}
+		// Refund only releases the pre-frozen entitlement window; no actual quota is consumed on failed relay attempts.
 		return upsertMarketplaceUsageLedgerTx(tx, marketplaceUsageLedgerInput{
 			EventKey:         m.requestId + ":refund_final",
 			RequestID:        m.requestId,
@@ -393,7 +396,7 @@ func supportsMarketplaceEntitlementRelay(relayInfo *relaycommon.RelayInfo, preCo
 
 func listCandidateMarketplaceLotsTx(tx *gorm.DB, userID int, modelName string, now int64) ([]model.EntitlementLot, error) {
 	var lots []model.EntitlementLot
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+	if err := lockForUpdate(tx).
 		Where("buyer_user_id = ? AND status = ?", userID, "active").
 		Where("expire_at = 0 OR expire_at > ?", now).
 		Find(&lots).Error; err != nil {
@@ -402,6 +405,8 @@ func listCandidateMarketplaceLotsTx(tx *gorm.DB, userID int, modelName string, n
 
 	filtered := make([]model.EntitlementLot, 0, len(lots))
 	for _, lot := range lots {
+		// Every candidate must still satisfy the full marketplace responsibility chain:
+		// entitlement -> listing -> supply -> active verified secret -> ready channel binding.
 		entitlement, err := getBuyerEntitlementByIDTx(tx, lot.BuyerEntitlementId)
 		if err != nil {
 			return nil, err

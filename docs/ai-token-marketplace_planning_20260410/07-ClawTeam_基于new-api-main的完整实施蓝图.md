@@ -513,3 +513,80 @@ flowchart TD
 一句话总结：
 
 `new-api-main` 不是完整集市，但它已经是一块非常好的“网关与平台基础设施底座”；正确做法不是推翻它，而是在它之上长出一层交易平台领域。`
+
+## 15. M1 实施回写（2026-04-15）
+
+### 15.1 已落地范围
+
+截至 2026-04-15，`M1` 已完成以下实现：
+
+- 交易域核心模型、迁移与三数据库兼容落地：
+  - `seller_profile`
+  - `supply_account`
+  - `seller_secret`
+  - `seller_secret_audit`
+  - `listing`
+  - `listing_sku`
+  - `inventory_snapshot`
+  - `market_order`
+  - `market_order_item`
+  - `buyer_entitlement`
+  - `entitlement_lot`
+  - `usage_ledger`
+- 后台管理链路已落地：
+  - seller 管理
+  - seller secret 导入、验活、禁用、恢复
+  - listing 与 SKU 管理
+  - admin orders / entitlements 只读运营页
+- 买方交易链路已落地：
+  - `/console/marketplace` 商品浏览
+  - 订单创建
+  - 支付发起
+  - 支付回跳后订单与 entitlement 状态刷新
+  - “我的订单”与 entitlement 摘要展示
+- relay 主闭环已落地：
+  - `marketplace_entitlement` 作为独立 billing source
+  - entitlement lot 预冻结 / 结算 / 失败退款
+  - entitlement channel 优先选路
+  - usage ledger 写入 seller / supply / listing / order / lot 元数据
+- 库存同步与自动停售已落地：
+  - `inventory_sync_task`
+  - seller secret / supply / binding 不健康时自动 `paused`
+  - 最低购买量无法满足时自动 `sold_out`
+
+### 15.2 已完成验证
+
+已完成的核心验证包括：
+
+- 最小业务链路：
+  - 创建 seller / supply / listing / sku
+  - 买方创建订单并支付成功
+  - entitlement 创建
+  - relay 命中 entitlement channel
+  - usage ledger 成功入账
+- 异常链路：
+  - 重复支付回调幂等
+  - matching entitlement 余额不足时返回 `insufficient_marketplace_entitlement`
+  - 无 matching entitlement 时，marketplace resolver 不拦截，回到原有 generic billing 决策
+  - relay 失败时 entitlement 预冻结释放，并写 failed usage ledger
+  - 库存不足触发 `sold_out`
+  - supply / secret 不健康触发 `paused`
+
+截至本次回写，验证结果为：
+
+- `go test ./model ./service ./controller ./router` 通过
+- `go test ./...` 通过
+- `cd web && npm run build` 通过
+
+### 15.3 当前已知剩余缺口
+
+以下能力仍保留为 `M2` 或后续阶段，不在本轮 `M1` 闭环内：
+
+- dispute 未闭环
+- settlement 未释放
+- withdrawal 未接入
+
+这意味着：
+
+- marketplace 交易主闭环已可演示
+- 当前仓库已经满足“核心分层测试 + 全仓 Go 测试 + 前端构建”三项收口条件

@@ -1,10 +1,12 @@
 package claude
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -349,6 +351,14 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 							Type: "text",
 							Text: common.GetPointer[string](mediaMessage.Text),
 						})
+					case dto.ContentTypeFile:
+						claudeFileMessage, err := buildClaudeFileMediaMessage(c, mediaMessage.GetFile())
+						if err != nil {
+							return nil, err
+						}
+						if claudeFileMessage != nil {
+							claudeMediaMessages = append(claudeMediaMessages, *claudeFileMessage)
+						}
 					default:
 						source := mediaMessage.ToFileSource()
 						if source == nil {
@@ -405,6 +415,62 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 	claudeRequest.Prompt = ""
 	claudeRequest.Messages = claudeMessages
 	return &claudeRequest, nil
+}
+
+func buildClaudeFileMediaMessage(c *gin.Context, file *dto.MessageFile) (*dto.ClaudeMediaMessage, error) {
+	if file == nil || file.FileData == "" {
+		return nil, nil
+	}
+
+	// Claude only accepts a narrow set of file payloads in M1, so we normalize by filename first.
+	mimeType := ""
+	if ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(file.FileName)), "."); ext != "" {
+		mimeType = service.GetMimeTypeByExtension(ext)
+	}
+
+	switch {
+	case mimeType == "text/plain":
+		decoded, err := base64.StdEncoding.DecodeString(file.FileData)
+		if err != nil {
+			return nil, fmt.Errorf("decode text file for Claude failed: %w", err)
+		}
+		text := string(decoded)
+		return &dto.ClaudeMediaMessage{
+			Type: "text",
+			Text: common.GetPointer[string](text),
+		}, nil
+	case mimeType == "application/pdf":
+		return buildClaudeBinaryMediaMessage(c, file.FileData, mimeType)
+	case strings.HasPrefix(mimeType, "image/"):
+		return buildClaudeBinaryMediaMessage(c, file.FileData, mimeType)
+	case mimeType == "" && strings.TrimSpace(file.FileName) == "":
+		return buildClaudeBinaryMediaMessage(c, file.FileData, "")
+	default:
+		// Unsupported files are ignored for Claude M1 compatibility.
+		return nil, nil
+	}
+}
+
+func buildClaudeBinaryMediaMessage(c *gin.Context, base64Data string, mimeType string) (*dto.ClaudeMediaMessage, error) {
+	// Re-run through the shared file loader so URL/file-source uploads and raw base64 follow one validation path.
+	source := types.NewFileSourceFromData(base64Data, mimeType)
+	encoded, detectedMimeType, err := service.GetBase64Data(c, source, "formatting file for Claude")
+	if err != nil {
+		return nil, fmt.Errorf("get file data failed: %s", err.Error())
+	}
+	claudeMediaMessage := &dto.ClaudeMediaMessage{
+		Source: &dto.ClaudeMessageSource{
+			Type: "base64",
+			Data: encoded,
+		},
+	}
+	if strings.HasPrefix(detectedMimeType, "application/pdf") {
+		claudeMediaMessage.Type = "document"
+	} else {
+		claudeMediaMessage.Type = "image"
+	}
+	claudeMediaMessage.Source.MediaType = detectedMimeType
+	return claudeMediaMessage, nil
 }
 
 func StreamResponseClaude2OpenAI(claudeResponse *dto.ClaudeResponse) *dto.ChatCompletionsStreamResponse {

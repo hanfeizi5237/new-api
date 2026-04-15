@@ -43,6 +43,7 @@ func setupMarketplaceServiceTestDB(t *testing.T) *gorm.DB {
 
 	if err := db.AutoMigrate(
 		&model.User{},
+		&model.Token{},
 		&model.Vendor{},
 		&model.Channel{},
 		&model.Log{},

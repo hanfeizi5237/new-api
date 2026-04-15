@@ -80,6 +80,7 @@ func PrepareMarketOrderPayment(input PrepareMarketOrderPaymentInput) (*MarketPay
 		return intent, nil
 	}
 
+	// Reuse the same provider intent while the order is still unpaid so repeated clicks do not spawn duplicate checkouts.
 	if cachedIntent, ok := decodeStoredMarketPaymentIntent(order, paymentMethod); ok {
 		return cachedIntent, nil
 	}
@@ -128,7 +129,7 @@ func CompleteMarketOrderPayment(input CompleteMarketOrderPaymentInput) (*model.M
 	var completedOrder *model.MarketOrder
 	err := model.DB.Transaction(func(tx *gorm.DB) error {
 		var order model.MarketOrder
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		if err := lockForUpdate(tx).
 			Where("order_no = ?", orderNo).
 			First(&order).Error; err != nil {
 			return err
@@ -146,6 +147,8 @@ func CompleteMarketOrderPayment(input CompleteMarketOrderPaymentInput) (*model.M
 		if trimmedCurrency := strings.ToUpper(strings.TrimSpace(input.Currency)); trimmedCurrency != "" && trimmedCurrency != order.Currency {
 			return errors.New("payment currency mismatch")
 		}
+		// A paid order may re-enter here when the PSP retries after entitlement grant failed.
+		// In that case we only replay entitlement creation and keep inventory counters untouched.
 		retryEntitlementGrantOnly := order.PaymentStatus == marketPaymentStatusPaid && order.EntitlementStatus == marketEntitlementStatusFailed
 
 		items, err := loadMarketOrderItemsTx(tx, order.Id)
@@ -160,11 +163,11 @@ func CompleteMarketOrderPayment(input CompleteMarketOrderPaymentInput) (*model.M
 			for _, item := range items {
 				grantAmount := item.PackageAmount * int64(item.Quantity)
 				var supply model.SupplyAccount
-				if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&supply, item.SupplyAccountId).Error; err != nil {
+				if err := lockForUpdate(tx).First(&supply, item.SupplyAccountId).Error; err != nil {
 					return err
 				}
 				var snapshot model.InventorySnapshot
-				if err := tx.Set("gorm:query_option", "FOR UPDATE").
+				if err := lockForUpdate(tx).
 					Where("supply_account_id = ?", item.SupplyAccountId).
 					First(&snapshot).Error; err != nil {
 					return err
@@ -240,7 +243,7 @@ func FailMarketOrderPayment(input FailMarketOrderPaymentInput) (*model.MarketOrd
 	var failedOrder *model.MarketOrder
 	err := model.DB.Transaction(func(tx *gorm.DB) error {
 		var order model.MarketOrder
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		if err := lockForUpdate(tx).
 			Where("order_no = ?", orderNo).
 			First(&order).Error; err != nil {
 			return err
@@ -259,6 +262,7 @@ func FailMarketOrderPayment(input FailMarketOrderPaymentInput) (*model.MarketOrd
 		now := common.GetTimestamp()
 		for _, item := range items {
 			releaseAmount := item.PackageAmount * int64(item.Quantity)
+			// Failed/expired orders must give the frozen inventory back before the order is closed.
 			if err := releaseInventoryFreezeTx(tx, item.SupplyAccountId, releaseAmount); err != nil {
 				return err
 			}

@@ -38,6 +38,7 @@ const routerMap = {
   orders: '/console/orders',
   entitlements: '/console/entitlements',
   token: '/console/token',
+  marketplace: '/console/marketplace',
   redemption: '/console/redemption',
   topup: '/console/topup',
   user: '/console/user',
@@ -132,6 +133,11 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         text: t('钱包管理'),
         itemKey: 'topup',
         to: '/topup',
+      },
+      {
+        text: t('集市'),
+        itemKey: 'marketplace',
+        to: '/marketplace',
       },
       {
         text: t('个人设置'),

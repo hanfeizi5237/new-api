@@ -112,6 +112,31 @@ func TestNewBillingSessionReturnsInsufficientMarketplaceEntitlementWithoutWallet
 	}
 }
 
+func TestResolveMarketplaceEntitlementBillingSessionSkipsWhenNoMarketplaceEntitlementMatches(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+	_ = seedMarketplaceServiceUser(t, db, "market-buyer-no-entitlement")
+
+	relayInfo := &relaycommon.RelayInfo{
+		UserId:          1,
+		OriginModelName: "gpt-4o-mini",
+		RequestId:       "req-marketplace-no-match-001",
+		TokenId:         1006,
+		TokenKey:        "market-token-no-match",
+		RelayMode:       relayconstant.RelayModeChatCompletions,
+	}
+
+	session, apiErr, handled := resolveMarketplaceEntitlementBillingSession(relayInfo, 400)
+	if handled {
+		t.Fatalf("expected marketplace entitlement resolver to skip when no entitlement matches, got session=%+v err=%v", session, apiErr)
+	}
+	if session != nil || apiErr != nil {
+		t.Fatalf("expected no session and no error when marketplace entitlement does not match, got session=%+v err=%v", session, apiErr)
+	}
+	if relayInfo.BillingSource != "" || relayInfo.EntitlementLotId != 0 || relayInfo.OrderId != 0 {
+		t.Fatalf("expected relayInfo to remain untouched when marketplace entitlement does not match, got %+v", relayInfo)
+	}
+}
+
 func TestMarketplaceBillingSessionSettleConsumesLotAndSupplyWithoutTouchingUserQuota(t *testing.T) {
 	db := setupMarketplaceServiceTestDB(t)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
@@ -267,6 +292,77 @@ func TestPostTextConsumeQuotaMarketplaceBillingDoesNotIncreaseUserUsedQuota(t *t
 	}
 	if lot.UsedAmount != 300 || lot.FrozenAmount != 0 {
 		t.Fatalf("expected entitlement lot to be settled from post text consume, got %+v", lot)
+	}
+}
+
+func TestMarketplaceBillingSessionRefundReleasesFrozenLotAndWritesFailedUsageLedger(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	ctx.Set("token_name", "marketplace-refund-token")
+
+	fixture := seedMarketplaceEntitlementBillingFixture(t, db, "market-buyer-billing-refund", 2000)
+
+	relayInfo := &relaycommon.RelayInfo{
+		UserId:          fixture.buyer.Id,
+		OriginModelName: fixture.supply.ModelName,
+		RequestId:       "req-marketplace-refund-001",
+		TokenId:         1005,
+		TokenKey:        "market-token-refund",
+		RelayMode:       relayconstant.RelayModeChatCompletions,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelId: fixture.channel.Id,
+		},
+		UserSetting: dto.UserSetting{
+			BillingPreference: "wallet_first",
+		},
+	}
+
+	session, apiErr := NewBillingSession(ctx, relayInfo, 400)
+	if apiErr != nil {
+		t.Fatalf("expected marketplace entitlement billing session for refund flow, got error: %v", apiErr)
+	}
+	if !session.NeedsRefund() {
+		t.Fatalf("expected marketplace billing session to require refund before relay failure")
+	}
+
+	session.Refund(ctx)
+
+	var (
+		lot         *model.EntitlementLot
+		entitlement *model.BuyerEntitlement
+		ledger      model.UsageLedger
+	)
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		var err error
+		lot, err = getEntitlementLotByID(fixture.lot.Id)
+		if err != nil {
+			t.Fatalf("failed to reload entitlement lot during refund wait: %v", err)
+		}
+		entitlement, err = getBuyerEntitlementByID(fixture.entitlement.Id)
+		if err != nil {
+			t.Fatalf("failed to reload entitlement during refund wait: %v", err)
+		}
+		ledgerErr := db.Where("request_id = ? AND ledger_status = ?", relayInfo.RequestId, "failed").First(&ledger).Error
+		if lot.FrozenAmount == 0 && entitlement.TotalFrozen == 0 && ledgerErr == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("refund did not finish in time, lot=%+v entitlement=%+v ledgerErr=%v", lot, entitlement, ledgerErr)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	if ledger.BillingSource != BillingSourceMarketplaceEntitlement || ledger.EntitlementLotId != fixture.lot.Id {
+		t.Fatalf("unexpected refund usage ledger payload: %+v", ledger)
+	}
+	if ledger.ActualQuota != 0 || ledger.PreConsumedQuota != 400 {
+		t.Fatalf("expected refund ledger to keep pre-consumed quota and zero actual quota, got %+v", ledger)
+	}
+	if ledger.OrderId != fixture.order.Id || ledger.SupplyAccountId != fixture.supply.Id || ledger.ChannelId != fixture.channel.Id {
+		t.Fatalf("unexpected refund ledger routing metadata: %+v", ledger)
 	}
 }
 

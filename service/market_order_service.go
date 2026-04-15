@@ -53,6 +53,7 @@ func CreateMarketOrder(input CreateMarketOrderInput) (*model.MarketOrder, []mode
 		return nil, nil, errors.New("idempotency_key is required")
 	}
 
+	// Reuse the original pending/paid order for the same buyer so refresh/retry does not freeze inventory twice.
 	existingOrder, err := model.GetMarketOrderByIdempotencyKey(idempotencyKey)
 	if err == nil {
 		if existingOrder.BuyerUserId != input.BuyerUserID {
@@ -162,11 +163,11 @@ func CreateMarketOrder(input CreateMarketOrderInput) (*model.MarketOrder, []mode
 
 	if err := model.DB.Transaction(func(tx *gorm.DB) error {
 		var lockedSupply model.SupplyAccount
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&lockedSupply, supply.Id).Error; err != nil {
+		if err := lockForUpdate(tx).First(&lockedSupply, supply.Id).Error; err != nil {
 			return err
 		}
 		var snapshot model.InventorySnapshot
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		if err := lockForUpdate(tx).
 			Where("supply_account_id = ?", lockedSupply.Id).
 			First(&snapshot).Error; err != nil {
 			return err
@@ -177,12 +178,22 @@ func CreateMarketOrder(input CreateMarketOrderInput) (*model.MarketOrder, []mode
 		if snapshot.AvailableAmount <= 0 {
 			snapshot.AvailableAmount = recomputeInventoryAvailableAmount(&lockedSupply, &snapshot)
 		}
-		if snapshot.AvailableAmount < freezeAmount {
+		// Keep the inventory freeze atomic while staying cross-database compatible.
+		result := tx.Model(&model.InventorySnapshot{}).
+			Where("id = ? AND available_amount >= ?", snapshot.Id, freezeAmount).
+			Updates(map[string]interface{}{
+				"frozen_amount":    gorm.Expr("frozen_amount + ?", freezeAmount),
+				"available_amount": gorm.Expr("available_amount - ?", freezeAmount),
+				"updated_at":       common.GetTimestamp(),
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
 			return errors.New("insufficient inventory")
 		}
-		snapshot.FrozenAmount += freezeAmount
-		snapshot.AvailableAmount = recomputeInventoryAvailableAmount(&lockedSupply, &snapshot)
-		if err := tx.Save(&snapshot).Error; err != nil {
+		// Re-read snapshot to keep in-memory state consistent for downstream logic.
+		if err := tx.Where("id = ?", snapshot.Id).First(&snapshot).Error; err != nil {
 			return err
 		}
 		if err := tx.Create(&order).Error; err != nil {
@@ -193,6 +204,7 @@ func CreateMarketOrder(input CreateMarketOrderInput) (*model.MarketOrder, []mode
 	}); err != nil {
 		return nil, nil, err
 	}
+	// Recompute listing visibility asynchronously after the write transaction commits.
 	syncMarketplaceInventoryAfterMutation(supply.Id, "order_created")
 
 	return &order, []model.MarketOrderItem{orderItem}, nil
@@ -258,7 +270,7 @@ func closeMarketOrder(orderID int, now int64, reason string) (bool, error) {
 	closed := false
 	err := model.DB.Transaction(func(tx *gorm.DB) error {
 		var order model.MarketOrder
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&order, orderID).Error; err != nil {
+		if err := lockForUpdate(tx).First(&order, orderID).Error; err != nil {
 			return err
 		}
 		if order.OrderStatus != marketOrderStatusPendingPayment || order.PaymentStatus != marketPaymentStatusUnpaid {
@@ -324,11 +336,11 @@ func loadMarketOrderItemsTx(tx *gorm.DB, orderID int) ([]model.MarketOrderItem, 
 
 func releaseInventoryFreezeTx(tx *gorm.DB, supplyAccountID int, releaseAmount int64) error {
 	var supply model.SupplyAccount
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&supply, supplyAccountID).Error; err != nil {
+	if err := lockForUpdate(tx).First(&supply, supplyAccountID).Error; err != nil {
 		return err
 	}
 	var snapshot model.InventorySnapshot
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+	if err := lockForUpdate(tx).
 		Where("supply_account_id = ?", supplyAccountID).
 		First(&snapshot).Error; err != nil {
 		return err

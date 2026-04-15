@@ -149,8 +149,8 @@ func createMarketStripePaymentIntent(input marketProviderPaymentInitInput) (*mar
 	if currency == "" {
 		currency = "cny"
 	}
-	successURL := strings.TrimRight(system_setting.ServerAddress, "/") + "/market"
-	cancelURL := strings.TrimRight(system_setting.ServerAddress, "/") + "/market"
+	successURL := getMarketplaceConsoleReturnURL("payment_return=1")
+	cancelURL := getMarketplaceConsoleReturnURL("payment_cancel=1")
 	params := &stripe.CheckoutSessionParams{
 		ClientReferenceID:   stripe.String(input.Order.OrderNo),
 		SuccessURL:          stripe.String(successURL),
@@ -268,7 +268,7 @@ func createMarketWaffoPaymentIntent(input marketProviderPaymentInitInput) (*mark
 	if setting.WaffoNotifyUrl != "" {
 		notifyURL = setting.WaffoNotifyUrl
 	}
-	returnURL := strings.TrimRight(system_setting.ServerAddress, "/") + "/market"
+	returnURL := getMarketplaceConsoleReturnURL("payment_return=1")
 	if setting.WaffoReturnUrl != "" {
 		returnURL = setting.WaffoReturnUrl
 	}
@@ -331,7 +331,7 @@ func createMarketEpayPaymentIntent(input marketProviderPaymentInitInput) (*marke
 		return nil, errors.New("epay payment type is not configured")
 	}
 	callbackAddr := GetCallbackAddress()
-	returnURL, err := url.Parse(strings.TrimRight(system_setting.ServerAddress, "/") + "/market")
+	returnURL, err := url.Parse(getMarketplaceConsoleReturnURL("payment_return=1"))
 	if err != nil {
 		return nil, err
 	}
@@ -460,4 +460,12 @@ func formatMarketMinorAmount(amountMinor int64, currency string) string {
 		return fmt.Sprintf("%d", amountMinor)
 	}
 	return decimal.NewFromInt(amountMinor).Div(decimal.NewFromInt(100)).StringFixed(2)
+}
+
+func getMarketplaceConsoleReturnURL(query string) string {
+	base := strings.TrimRight(system_setting.ServerAddress, "/") + "/console/marketplace"
+	if strings.TrimSpace(query) == "" {
+		return base
+	}
+	return base + "?" + strings.TrimLeft(strings.TrimSpace(query), "?")
 }

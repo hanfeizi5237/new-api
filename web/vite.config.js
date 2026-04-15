@@ -24,6 +24,27 @@ import path from 'path';
 import { codeInspectorPlugin } from 'code-inspector-plugin';
 const { vitePluginSemi } = pkg;
 
+const resolveVendorChunk = (id) => {
+  if (!id.includes('node_modules')) {
+    return undefined;
+  }
+  const normalizedId = id.split(path.sep).join('/');
+  // Keep Semi UI and i18n runtime together to avoid circular chunk warnings.
+  if (
+    normalizedId.includes('@douyinfe/semi-icons') ||
+    normalizedId.includes('@douyinfe/semi-ui') ||
+    normalizedId.includes('i18next-browser-languagedetector') ||
+    normalizedId.includes('react-i18next') ||
+    normalizedId.includes('/i18next/')
+  ) {
+    return 'ui-runtime';
+  }
+  if (normalizedId.includes('@lobehub/icons')) {
+    return 'icon-runtime';
+  }
+  return undefined;
+};
+
 // https://vitejs.dev/config/
 export default defineConfig({
   resolve: {
@@ -65,25 +86,10 @@ export default defineConfig({
     },
   },
   build: {
+    chunkSizeWarningLimit: 1800,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-core': ['react', 'react-dom', 'react-router-dom'],
-          'semi-ui': ['@douyinfe/semi-icons', '@douyinfe/semi-ui'],
-          tools: ['axios', 'history', 'marked'],
-          'react-components': [
-            'react-dropzone',
-            'react-fireworks',
-            'react-telegram-login',
-            'react-toastify',
-            'react-turnstile',
-          ],
-          i18n: [
-            'i18next',
-            'react-i18next',
-            'i18next-browser-languagedetector',
-          ],
-        },
+        manualChunks: resolveVendorChunk,
       },
     },
   },

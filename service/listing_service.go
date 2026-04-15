@@ -167,7 +167,7 @@ func CreateListingWithSKUs(input CreateListingInput) (*model.Listing, []model.Li
 		if skus[i].PackageUnit == "" {
 			skus[i].PackageUnit = supply.QuotaUnit
 		}
-		if skus[i].PackageUnit != "token" || skus[i].PackageUnit != supply.QuotaUnit {
+		if skus[i].PackageUnit != "token" {
 			return nil, nil, errors.New("M1 only supports token-based sku units")
 		}
 	}

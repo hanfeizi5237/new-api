@@ -46,7 +46,7 @@ func grantEntitlementsForOrderTx(tx *gorm.DB, order *model.MarketOrder, items []
 		}
 
 		var entitlement model.BuyerEntitlement
-		err := tx.Set("gorm:query_option", "FOR UPDATE").
+		err := lockForUpdate(tx).
 			Where("buyer_user_id = ? AND vendor_id = ? AND model_name = ?", order.BuyerUserId, item.VendorId, item.ModelName).
 			First(&entitlement).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {

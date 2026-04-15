@@ -92,7 +92,7 @@ func syncMarketplaceInventoryBySupplyAccountIDTx(tx *gorm.DB, supplyAccountID in
 	}
 
 	var supply model.SupplyAccount
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&supply, supplyAccountID).Error; err != nil {
+	if err := lockForUpdate(tx).First(&supply, supplyAccountID).Error; err != nil {
 		return err
 	}
 	var seller model.SellerProfile
@@ -115,6 +115,7 @@ func syncMarketplaceInventoryBySupplyAccountIDTx(tx *gorm.DB, supplyAccountID in
 	if err != nil {
 		return err
 	}
+	// Snapshot is the shared inventory view used by order freeze, entitlement settle, and auto-pause decisions.
 	snapshot.SyncStatus = syncStatus
 	snapshot.SyncMessage = syncMessage
 	snapshot.AvailableAmount = recomputeInventoryAvailableAmount(&supply, snapshot)
@@ -129,6 +130,7 @@ func syncMarketplaceInventoryBySupplyAccountIDTx(tx *gorm.DB, supplyAccountID in
 		return err
 	}
 	for i := range listings {
+		// Listing status follows the underlying supply health; manual re-activation remains an explicit admin action.
 		nextStatus, changed, statusReason, err := deriveSyncedListingStatusTx(tx, &listings[i], &supply, &seller, snapshot, secretReady, bindingReady)
 		if err != nil {
 			return err
@@ -153,7 +155,7 @@ func syncMarketplaceInventoryBySupplyAccountIDTx(tx *gorm.DB, supplyAccountID in
 
 func loadOrCreateInventorySnapshotTx(tx *gorm.DB, supply *model.SupplyAccount) (*model.InventorySnapshot, error) {
 	var snapshot model.InventorySnapshot
-	err := tx.Set("gorm:query_option", "FOR UPDATE").
+	err := lockForUpdate(tx).
 		Where("supply_account_id = ?", supply.Id).
 		First(&snapshot).Error
 	if err == nil {
