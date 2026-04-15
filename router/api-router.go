@@ -171,6 +171,8 @@ func SetApiRouter(router *gin.Engine) {
 		marketplaceAdminRoute := apiRouter.Group("/marketplace/admin")
 		marketplaceAdminRoute.Use(middleware.AdminAuth())
 		{
+			marketplaceAdminRoute.GET("/orders", controller.GetMarketOrdersAdmin)
+			marketplaceAdminRoute.GET("/entitlements", controller.GetMarketEntitlementsAdmin)
 			marketplaceAdminRoute.GET("/seller-secrets", controller.GetSellerSecretsAdmin)
 			marketplaceAdminRoute.POST("/seller-secrets", controller.CreateSellerSecretAdmin)
 			marketplaceAdminRoute.POST("/seller-secrets/:id/verify", controller.VerifySellerSecretAdmin)

@@ -1,6 +1,10 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"strings"
+
+	"gorm.io/gorm"
+)
 
 type BuyerEntitlement struct {
 	Id            int    `json:"id"`
@@ -61,6 +65,28 @@ func GetBuyerEntitlements(buyerUserId int, modelName string, offset int, limit i
 	db := DB.Model(&BuyerEntitlement{}).Where("buyer_user_id = ?", buyerUserId)
 	if modelName != "" {
 		db = db.Where("model_name = ?", modelName)
+	}
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var entitlements []*BuyerEntitlement
+	if err := db.Order("id desc").Offset(offset).Limit(limit).Find(&entitlements).Error; err != nil {
+		return nil, 0, err
+	}
+	return entitlements, total, nil
+}
+
+func GetEntitlements(buyerUserId int, modelName string, status string, offset int, limit int) ([]*BuyerEntitlement, int64, error) {
+	db := DB.Model(&BuyerEntitlement{})
+	if buyerUserId > 0 {
+		db = db.Where("buyer_user_id = ?", buyerUserId)
+	}
+	if trimmed := strings.TrimSpace(modelName); trimmed != "" {
+		db = db.Where("model_name = ?", trimmed)
+	}
+	if trimmed := strings.TrimSpace(status); trimmed != "" {
+		db = db.Where("status = ?", trimmed)
 	}
 	var total int64
 	if err := db.Count(&total).Error; err != nil {

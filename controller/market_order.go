@@ -114,6 +114,39 @@ func GetMarketOrders(c *gin.Context) {
 	common.ApiSuccess(c, pageInfo)
 }
 
+func GetMarketOrdersAdmin(c *gin.Context) {
+	pageInfo := common.GetPageQuery(c)
+	buyerUserId, _ := strconv.Atoi(c.Query("buyer_user_id"))
+	orders, total, err := service.ListMarketOrdersAdmin(
+		c.Query("keyword"),
+		buyerUserId,
+		c.Query("order_status"),
+		c.Query("payment_status"),
+		c.Query("entitlement_status"),
+		pageInfo.GetStartIdx(),
+		pageInfo.GetPageSize(),
+	)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	items := make([]MarketOrderView, 0, len(orders))
+	for _, order := range orders {
+		orderItems, itemErr := model.GetMarketOrderItemsByOrderID(order.Id)
+		if itemErr != nil {
+			common.ApiError(c, itemErr)
+			return
+		}
+		items = append(items, MarketOrderView{
+			Order: order,
+			Items: orderItems,
+		})
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(items)
+	common.ApiSuccess(c, pageInfo)
+}
+
 func GetMarketOrder(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

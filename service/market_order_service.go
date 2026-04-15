@@ -205,6 +205,10 @@ func ListBuyerMarketOrders(buyerUserId int, offset int, limit int) ([]*model.Mar
 	return model.GetBuyerMarketOrders(buyerUserId, offset, limit)
 }
 
+func ListMarketOrdersAdmin(keyword string, buyerUserId int, orderStatus string, paymentStatus string, entitlementStatus string, offset int, limit int) ([]*model.MarketOrder, int64, error) {
+	return model.GetMarketOrders(keyword, buyerUserId, orderStatus, paymentStatus, entitlementStatus, offset, limit)
+}
+
 func GetBuyerMarketOrderDetail(orderId int, buyerUserId int) (*MarketOrderDetail, error) {
 	if orderId <= 0 || buyerUserId <= 0 {
 		return nil, errors.New("invalid order_id or buyer_user_id")

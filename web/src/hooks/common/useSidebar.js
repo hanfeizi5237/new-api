@@ -47,6 +47,10 @@ export const DEFAULT_ADMIN_CONFIG = {
   admin: {
     enabled: true,
     channel: true,
+    sellers: true,
+    listings: true,
+    orders: true,
+    entitlements: true,
     models: true,
     deployment: true,
     redemption: true,

@@ -32,8 +32,12 @@ import { StatusContext } from './context/Status';
 import PasswordResetForm from './components/auth/PasswordResetForm';
 import PasswordResetConfirm from './components/auth/PasswordResetConfirm';
 import Channel from './pages/Channel';
+import Entitlement from './pages/Entitlement';
+import Listing from './pages/Listing';
 import Token from './pages/Token';
+import Order from './pages/Order';
 import Redemption from './pages/Redemption';
+import Seller from './pages/Seller';
 import TopUp from './pages/TopUp';
 import Log from './pages/Log';
 import Chat from './pages/Chat';
@@ -168,6 +172,38 @@ function App() {
           element={
             <AdminRoute>
               <User />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path='/console/sellers'
+          element={
+            <AdminRoute>
+              <Seller />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path='/console/listings'
+          element={
+            <AdminRoute>
+              <Listing />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path='/console/orders'
+          element={
+            <AdminRoute>
+              <Order />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path='/console/entitlements'
+          element={
+            <AdminRoute>
+              <Entitlement />
             </AdminRoute>
           }
         />

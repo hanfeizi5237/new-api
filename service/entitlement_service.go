@@ -16,6 +16,10 @@ func ListBuyerEntitlements(buyerUserId int, modelName string, offset int, limit 
 	return model.GetBuyerEntitlements(buyerUserId, modelName, offset, limit)
 }
 
+func ListEntitlementsAdmin(buyerUserId int, modelName string, status string, offset int, limit int) ([]*model.BuyerEntitlement, int64, error) {
+	return model.GetEntitlements(buyerUserId, modelName, status, offset, limit)
+}
+
 func grantEntitlementsForOrderTx(tx *gorm.DB, order *model.MarketOrder, items []model.MarketOrderItem) error {
 	if tx == nil || order == nil {
 		return errors.New("invalid order grant context")

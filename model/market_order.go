@@ -1,6 +1,10 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"strings"
+
+	"gorm.io/gorm"
+)
 
 type MarketOrder struct {
 	Id                  int    `json:"id"`
@@ -103,6 +107,38 @@ func GetMarketOrderItemsByOrderID(orderId int) ([]MarketOrderItem, error) {
 
 func GetBuyerMarketOrders(buyerUserId int, offset int, limit int) ([]*MarketOrder, int64, error) {
 	db := DB.Model(&MarketOrder{}).Where("buyer_user_id = ?", buyerUserId)
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var orders []*MarketOrder
+	if err := db.Order("id desc").Offset(offset).Limit(limit).Find(&orders).Error; err != nil {
+		return nil, 0, err
+	}
+	return orders, total, nil
+}
+
+func GetMarketOrders(keyword string, buyerUserId int, orderStatus string, paymentStatus string, entitlementStatus string, offset int, limit int) ([]*MarketOrder, int64, error) {
+	db := DB.Model(&MarketOrder{})
+	if buyerUserId > 0 {
+		db = db.Where("buyer_user_id = ?", buyerUserId)
+	}
+	if trimmed := strings.TrimSpace(orderStatus); trimmed != "" {
+		db = db.Where("order_status = ?", trimmed)
+	}
+	if trimmed := strings.TrimSpace(paymentStatus); trimmed != "" {
+		db = db.Where("payment_status = ?", trimmed)
+	}
+	if trimmed := strings.TrimSpace(entitlementStatus); trimmed != "" {
+		db = db.Where("entitlement_status = ?", trimmed)
+	}
+	if trimmed := strings.TrimSpace(keyword); trimmed != "" {
+		like := "%" + trimmed + "%"
+		db = db.Where(
+			"order_no LIKE ? OR payment_trade_no LIKE ? OR payment_method LIKE ?",
+			like, like, like,
+		)
+	}
 	var total int64
 	if err := db.Count(&total).Error; err != nil {
 		return nil, 0, err

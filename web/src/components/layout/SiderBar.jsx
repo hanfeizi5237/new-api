@@ -33,6 +33,10 @@ import { Nav, Divider, Button } from '@douyinfe/semi-ui';
 const routerMap = {
   home: '/',
   channel: '/console/channel',
+  sellers: '/console/sellers',
+  listings: '/console/listings',
+  orders: '/console/orders',
+  entitlements: '/console/entitlements',
   token: '/console/token',
   redemption: '/console/redemption',
   topup: '/console/topup',
@@ -181,6 +185,30 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         text: t('用户管理'),
         itemKey: 'user',
         to: '/user',
+        className: isAdmin() ? '' : 'tableHiddle',
+      },
+      {
+        text: t('卖家管理'),
+        itemKey: 'sellers',
+        to: '/sellers',
+        className: isAdmin() ? '' : 'tableHiddle',
+      },
+      {
+        text: t('商品管理'),
+        itemKey: 'listings',
+        to: '/listings',
+        className: isAdmin() ? '' : 'tableHiddle',
+      },
+      {
+        text: t('订单管理'),
+        itemKey: 'orders',
+        to: '/orders',
+        className: isAdmin() ? '' : 'tableHiddle',
+      },
+      {
+        text: t('权益管理'),
+        itemKey: 'entitlements',
+        to: '/entitlements',
         className: isAdmin() ? '' : 'tableHiddle',
       },
       {
