@@ -42,29 +42,30 @@ func getTimestampNormExpr(granularity string) string {
 	case "mysql":
 		switch granularity {
 		case "day", "week":
-			return "UNIX_TIMESTAMP(DATE(FROM_UNIXTIME(created_at)))"
+			// 按东八区本地日分桶：先 +8h 再按天取整，再回退 8h
+			return "((((created_at + 28800) DIV 86400) * 86400) - 28800)"
 		case "month":
 			return "UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(created_at), '%Y-%m-01'))"
 		default:
-			return "UNIX_TIMESTAMP(DATE(FROM_UNIXTIME(created_at)))"
+			return "((((created_at + 28800) DIV 86400) * 86400) - 28800)"
 		}
 	case "postgres":
 		switch granularity {
 		case "day", "week":
-			return "EXTRACT(EPOCH FROM DATE(TO_TIMESTAMP(created_at)))"
+			return "((((created_at + 28800) / 86400) * 86400) - 28800)"
 		case "month":
 			return "EXTRACT(EPOCH FROM DATE_TRUNC('month', TO_TIMESTAMP(created_at)))"
 		default:
-			return "EXTRACT(EPOCH FROM DATE(TO_TIMESTAMP(created_at)))"
+			return "((((created_at + 28800) / 86400) * 86400) - 28800)"
 		}
 	case "sqlite":
 		switch granularity {
 		case "day", "week":
-			return "strftime('%s', DATE(created_at, 'unixepoch'))"
+			return "((CAST(((created_at + 28800) / 86400) AS INTEGER) * 86400) - 28800)"
 		case "month":
 			return "strftime('%s', strftime('%Y-%m-01', created_at, 'unixepoch'))"
 		default:
-			return "strftime('%s', DATE(created_at, 'unixepoch'))"
+			return "((CAST(((created_at + 28800) / 86400) AS INTEGER) * 86400) - 28800)"
 		}
 	default:
 		return "created_at - (created_at % 86400)"

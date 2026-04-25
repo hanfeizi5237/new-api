@@ -24,14 +24,17 @@ import { USER_COLORS } from '../../constants/user-usage.constants';
 
 const emptyPie = [{ type: '无数据', value: 0 }];
 const tsLabel = (ts) => new Date(ts * 1000).toLocaleDateString('zh-CN');
+const quotaPerUnit = () => parseFloat(localStorage.getItem('quota_per_unit') || '500000');
+const quotaToUsd = (quota) => { const qpu = quotaPerUnit(); return qpu > 0 ? Number((Number(quota || 0) / qpu).toFixed(6)) : 0; };
+const tokensToMillions = (tokens) => Number((Number(tokens || 0) / 1000000).toFixed(4));
 
 export const useUserUsageCharts = () => {
   const [specUserRank, setSpecUserRank] = useState({ type: 'bar', data: [{ id: 'userRankData', values: [] }], xField: 'rawQuota', yField: 'User', seriesField: 'User', direction: 'horizontal', legends: { visible: false }, title: { visible: true, text: '用户消耗排行', subtext: '' }, label: { visible: true, position: 'outside', formatMethod: (v, d) => renderQuota(d.rawQuota || 0, 2) }, axes: [{ orient: 'left', type: 'band', label: { visible: true } }, { orient: 'bottom', type: 'linear', visible: false }], color: { type: 'ordinal', range: USER_COLORS } });
   const [specUserTrend, setSpecUserTrend] = useState({ type: 'line', data: [{ id: 'userTrendData', values: [] }], xField: 'Time', yField: 'rawQuota', seriesField: 'User', legends: { visible: true, selectMode: 'single' }, title: { visible: true, text: '用户用量趋势', subtext: '' }, axes: [{ orient: 'left', label: { formatMethod: (v) => renderQuota(v, 2) } }], color: { type: 'ordinal', range: USER_COLORS } });
   const [specCountRank, setSpecCountRank] = useState({ type: 'bar', data: [{ id: 'countRankData', values: [] }], xField: 'User', yField: 'Count', seriesField: 'User', legends: { visible: false }, title: { visible: true, text: '调用次数排行', subtext: '' }, color: { type: 'ordinal', range: USER_COLORS } });
   const [specErrorUserRank, setSpecErrorUserRank] = useState({ type: 'bar', data: [{ id: 'errorUserRankData', values: [] }], xField: 'User', yField: 'Errors', seriesField: 'User', legends: { visible: false }, title: { visible: true, text: '失败用户排行', subtext: '' }, color: { type: 'ordinal', range: ['#ef4444', '#f97316', '#f59e0b', '#8b5cf6'] } });
-  const [specDailyQuotaTrend, setSpecDailyQuotaTrend] = useState({ type: 'line', data: [{ id: 'dailyQuotaTrendData', values: [] }], xField: 'Time', yField: 'value', seriesField: 'Metric', legends: { visible: false }, title: { visible: true, text: '按日金额消耗趋势', subtext: '' }, axes: [{ orient: 'left', label: { formatMethod: (v) => renderQuota(v, 2) } }], color: { specified: { '金额消耗': '#3b82f6' } } });
-  const [specDailyTokenTrend, setSpecDailyTokenTrend] = useState({ type: 'line', data: [{ id: 'dailyTokenTrendData', values: [] }], xField: 'Time', yField: 'value', seriesField: 'Metric', legends: { visible: false }, title: { visible: true, text: '按日 Token 消耗趋势', subtext: '' }, axes: [{ orient: 'left' }], color: { specified: { 'Token 消耗': '#8b5cf6' } } });
+  const [specDailyQuotaTrend, setSpecDailyQuotaTrend] = useState({ type: 'line', data: [{ id: 'dailyQuotaTrendData', values: [] }], xField: 'Time', yField: 'value', seriesField: 'Metric', legends: { visible: false }, title: { visible: true, text: '按日金额消耗趋势', subtext: '' }, axes: [{ orient: 'left', label: { formatMethod: (v) => `$${Number(v || 0).toFixed(2)}` } }], tooltip: { mark: { content: [{ key: (d) => d['Time'], value: (d) => `$${Number(d['value'] || 0).toFixed(2)}` }] } }, color: { specified: { '金额消耗': '#3b82f6' } } });
+  const [specDailyTokenTrend, setSpecDailyTokenTrend] = useState({ type: 'line', data: [{ id: 'dailyTokenTrendData', values: [] }], xField: 'Time', yField: 'value', seriesField: 'Metric', legends: { visible: false }, title: { visible: true, text: '按日 Token 消耗趋势（百万）', subtext: '' }, axes: [{ orient: 'left', label: { formatMethod: (v) => `${Number(v || 0).toFixed(2)}M` } }], tooltip: { mark: { content: [{ key: (d) => d['Time'], value: (d) => `${Number(d['value'] || 0).toFixed(2)}M` }] } }, color: { specified: { 'Token 消耗': '#8b5cf6' } } });
   const [specModelPie, setSpecModelPie] = useState({ type: 'pie', data: [{ id: 'modelPieData', values: emptyPie }], outerRadius: 0.8, innerRadius: 0.5, padAngle: 0.6, valueField: 'value', categoryField: 'type', legends: { visible: true, orient: 'left' }, title: { visible: true, text: '模型调用次数占比', subtext: '' }, color: { specified: {} } });
   const [specDetailModelQuotaPie, setSpecDetailModelQuotaPie] = useState({ type: 'pie', data: [{ id: 'detailQuotaPie', values: emptyPie }], outerRadius: 0.8, innerRadius: 0.5, padAngle: 0.6, valueField: 'value', categoryField: 'type', legends: { visible: true, orient: 'left' }, title: { visible: true, text: '模型消耗占比', subtext: '' }, color: { specified: {} } });
   const [specModelRank, setSpecModelRank] = useState({ type: 'bar', data: [{ id: 'modelRankData', values: [] }], xField: 'Model', yField: 'Count', seriesField: 'Model', legends: { visible: false }, title: { visible: true, text: '模型调用次数排行', subtext: '' }, color: { specified: {} } });
@@ -66,8 +69,8 @@ export const useUserUsageCharts = () => {
     const dailyTokenValues = [];
     (globalTimeSeries || []).forEach((p) => {
       const time = tsLabel(p.timestamp);
-      dailyQuotaValues.push({ Time: time, Metric: '金额消耗', value: p.quota || 0 });
-      dailyTokenValues.push({ Time: time, Metric: 'Token 消耗', value: p.tokens || 0 });
+      dailyQuotaValues.push({ Time: time, Metric: '金额消耗', value: quotaToUsd(p.quota || 0) });
+      dailyTokenValues.push({ Time: time, Metric: 'Token 消耗', value: tokensToMillions(p.tokens || 0) });
     });
     setSpecDailyQuotaTrend((prev) => ({ ...prev, data: [{ id: 'dailyQuotaTrendData', values: dailyQuotaValues }] }));
     setSpecDailyTokenTrend((prev) => ({ ...prev, data: [{ id: 'dailyTokenTrendData', values: dailyTokenValues }] }));
