@@ -3,8 +3,7 @@ Copyright (C) 2025 QuantumNous
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
+published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -28,13 +27,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { useIsMobile } from '../../hooks/common/useIsMobile';
 import { useSidebarCollapsed } from '../../hooks/common/useSidebarCollapsed';
 import { useTranslation } from 'react-i18next';
-import {
-  API,
-  getLogo,
-  getSystemName,
-  showError,
-  setStatusData,
-} from '../../helpers';
+import { API, getLogo, getSystemName, showError, setStatusData } from '../../helpers';
 import { UserContext } from '../../context/User';
 import { StatusContext } from '../../context/Status';
 import { useLocation } from 'react-router-dom';
@@ -64,12 +57,16 @@ const PageLayout = () => {
 
   const shouldHideFooter = cardProPages.includes(location.pathname);
 
+  const consoleLikeRoutes = ['/user-usage'];
+  const isConsoleRoute =
+    location.pathname.startsWith('/console') ||
+    consoleLikeRoutes.some((route) => location.pathname.startsWith(route));
+
   const shouldInnerPadding =
-    location.pathname.includes('/console') &&
+    (location.pathname.includes('/console') || location.pathname.startsWith('/user-usage')) &&
     !location.pathname.startsWith('/console/chat') &&
     location.pathname !== '/console/playground';
 
-  const isConsoleRoute = location.pathname.startsWith('/console');
   const showSider = isConsoleRoute && (!isMobile || drawerOpen);
 
   useEffect(() => {
@@ -124,9 +121,7 @@ const PageLayout = () => {
       try {
         const settings = JSON.parse(userState.user.setting);
         preferredLang = normalizeLanguage(settings.language);
-      } catch (e) {
-        // Ignore parse errors
-      }
+      } catch (e) {}
     }
 
     if (!preferredLang) {
@@ -198,11 +193,7 @@ const PageLayout = () => {
         )}
         <Layout
           style={{
-            marginLeft: isMobile
-              ? '0'
-              : showSider
-                ? 'var(--sidebar-current-width)'
-                : '0',
+            marginLeft: isMobile ? '0' : showSider ? 'var(--sidebar-current-width)' : '0',
             flex: '1 1 auto',
             display: 'flex',
             flexDirection: 'column',
@@ -222,12 +213,7 @@ const PageLayout = () => {
             </ErrorBoundary>
           </Content>
           {!shouldHideFooter && (
-            <Layout.Footer
-              style={{
-                flex: '0 0 auto',
-                width: '100%',
-              }}
-            >
+            <Layout.Footer style={{ flex: '0 0 auto', width: '100%' }}>
               <FooterBar />
             </Layout.Footer>
           )}

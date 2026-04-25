@@ -19,7 +19,29 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { useState, useCallback, useRef } from 'react';
 import { API, showError, showSuccess, renderQuota, renderNumber, getQuotaWithUnit } from '../../helpers';
-import { DEFAULT_DATE_RANGE, MAX_DATE_RANGE_DAYS, EXPORT_FORMATS } from '../../constants/user-usage.constants';
+import { DEFAULT_DATE_RANGE, MAX_DATE_RANGE_DAYS } from '../../constants/user-usage.constants';
+
+const pad = (n) => String(n).padStart(2, '0');
+const formatDate = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+const getPresetDateRange = (type, endDateStr) => {
+  const endDate = endDateStr ? new Date(`${endDateStr}T00:00:00`) : new Date();
+  const end = new Date(endDate);
+  const start = new Date(endDate);
+
+  if (type === 'day') {
+    return { start: formatDate(end), end: formatDate(end) };
+  }
+  if (type === 'week') {
+    start.setDate(start.getDate() - 6);
+    return { start: formatDate(start), end: formatDate(end) };
+  }
+  if (type === 'month') {
+    start.setMonth(start.getMonth() - 1);
+    return { start: formatDate(start), end: formatDate(end) };
+  }
+  return { start: formatDate(end), end: formatDate(end) };
+};
 
 export const useUserUsageData = () => {
   const [loading, setLoading] = useState(false);
@@ -34,10 +56,9 @@ export const useUserUsageData = () => {
 
   const abortControllerRef = useRef(null);
 
-  // ========== 日期范围工具 ==========
   const dateRangeToTimestamps = useCallback((range) => {
-    const startTs = Math.floor(new Date(range.start + 'T00:00:00').getTime() / 1000);
-    const endTs = Math.floor(new Date(range.end + 'T23:59:59').getTime() / 1000);
+    const startTs = Math.floor(new Date(`${range.start}T00:00:00`).getTime() / 1000);
+    const endTs = Math.floor(new Date(`${range.end}T23:59:59`).getTime() / 1000);
     return { startTs, endTs };
   }, []);
 
@@ -46,8 +67,8 @@ export const useUserUsageData = () => {
       showError('请选择日期范围');
       return false;
     }
-    const start = new Date(range.start);
-    const end = new Date(range.end);
+    const start = new Date(`${range.start}T00:00:00`);
+    const end = new Date(`${range.end}T00:00:00`);
     const diffDays = (end - start) / (1000 * 60 * 60 * 24);
     if (diffDays < 0) {
       showError('结束日期不能早于开始日期');
@@ -60,11 +81,9 @@ export const useUserUsageData = () => {
     return true;
   }, []);
 
-  // ========== API 调用 ==========
   const loadOverview = useCallback(async () => {
     if (!validateDateRange(dateRange)) return;
 
-    // 取消之前的请求
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -132,7 +151,6 @@ export const useUserUsageData = () => {
     setDetailData(null);
   }, []);
 
-  // ========== 汇总计算 ==========
   const getSummary = useCallback(() => {
     let totalUsers = overviewData.length;
     let totalCount = 0;
@@ -150,7 +168,6 @@ export const useUserUsageData = () => {
     return { totalUsers, totalCount, totalQuota, totalTokens, totalErrors };
   }, [overviewData]);
 
-  // ========== 导出 CSV ==========
   const exportCSV = useCallback(() => {
     if (overviewData.length === 0) {
       showError('没有可导出的数据');
@@ -166,7 +183,6 @@ export const useUserUsageData = () => {
       user.error_count || 0,
     ]);
 
-    // 添加汇总行
     const summary = getSummary();
     rows.push([
       '总计',
@@ -176,13 +192,7 @@ export const useUserUsageData = () => {
       summary.totalErrors,
     ]);
 
-    // 构建 CSV 内容
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.join(',')),
-    ].join('\n');
-
-    // 添加 BOM 以支持 Excel 中文
+    const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
     const bom = '\uFEFF';
     const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -191,21 +201,20 @@ export const useUserUsageData = () => {
     link.download = `用户用量统计_${dateRange.start}_${dateRange.end}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-
     showSuccess('导出成功');
   }, [overviewData, dateRange, getSummary]);
 
-  // ========== 日期变更 ==========
   const handleDateRangeChange = useCallback((newRange) => {
     setDateRange(newRange);
+    setGranularity('day');
   }, []);
 
   const handleGranularityChange = useCallback((newGranularity) => {
     setGranularity(newGranularity);
+    setDateRange((prev) => getPresetDateRange(newGranularity, prev?.end || DEFAULT_DATE_RANGE().end));
   }, []);
 
   return {
-    // 状态
     loading,
     detailLoading,
     overviewData,
@@ -215,8 +224,6 @@ export const useUserUsageData = () => {
     selectedUser,
     drawerVisible,
     activeDetailTab,
-
-    // 操作
     loadOverview,
     loadDetail,
     openUserDetail,
@@ -226,8 +233,6 @@ export const useUserUsageData = () => {
     handleGranularityChange,
     exportCSV,
     getSummary,
-
-    // 工具
     renderQuota,
     renderNumber,
     getQuotaWithUnit,

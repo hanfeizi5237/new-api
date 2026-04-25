@@ -17,25 +17,13 @@ along with this program. If not see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useEffect, useCallback } from 'react';
-import { Card, Button, Table, Tag, Typography, DatePicker, Space, Descriptions } from '@douyinfe/semi-ui';
-import {
-  Users,
-  Activity,
-  CreditCard,
-  FileText,
-  AlertCircle,
-  Download,
-  RefreshCw,
-  ArrowUpRight,
-  Calendar,
-} from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Typography } from '@douyinfe/semi-ui';
+import { Calendar } from 'lucide-react';
 import MainDashboardView from '../../components/user-usage/MainDashboardView';
 import UserDetailView from '../../components/user-usage/UserDetailView';
 import { useUserUsageData } from '../../hooks/user-usage/useUserUsageData';
 import { useUserUsageCharts } from '../../hooks/user-usage/useUserUsageCharts';
-import { GRANULARITY_OPTIONS, MAX_DATE_RANGE_DAYS } from '../../constants/user-usage.constants';
-import { renderQuota, renderNumber } from '../../helpers';
 
 const { Text } = Typography;
 
@@ -46,8 +34,8 @@ const UserUsageDashboard = () => {
   const {
     loading,
     overviewData,
-    dateRange,
     granularity,
+    dateRange,
     drawerVisible,
     selectedUser,
     detailLoading,
@@ -65,19 +53,16 @@ const UserUsageDashboard = () => {
 
   const summary = getSummary();
 
-  // 初始加载
   useEffect(() => {
     loadOverview();
   }, []);
 
-  // 数据加载后更新图表
   useEffect(() => {
     if (overviewData.length > 0) {
       charts.updateOverviewCharts(overviewData);
     }
   }, [overviewData]);
 
-  // 详情数据加载后更新图表
   useEffect(() => {
     if (detailData) {
       charts.updateDetailCharts(detailData);
@@ -86,7 +71,6 @@ const UserUsageDashboard = () => {
 
   return (
     <div className='mt-[60px] px-2 pb-8'>
-      {/* 页面标题 */}
       <div className='flex items-center justify-between mb-4'>
         <div className='flex items-center gap-2'>
           <Calendar size={20} />
@@ -97,8 +81,8 @@ const UserUsageDashboard = () => {
       <MainDashboardView
         loading={loading}
         overviewData={overviewData}
-        dateRange={dateRange}
         granularity={granularity}
+        dateRange={dateRange}
         summary={summary}
         loadOverview={loadOverview}
         handleDateRangeChange={handleDateRangeChange}
@@ -117,6 +101,7 @@ const UserUsageDashboard = () => {
         activeDetailTab={activeDetailTab}
         setActiveDetailTab={setActiveDetailTab}
         charts={charts}
+        dateRange={dateRange}
       />
     </div>
   );

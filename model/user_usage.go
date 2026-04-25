@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -22,6 +23,13 @@ func getDBType() string {
 	return "sqlite"
 }
 
+func normalizeModelName(name string) string {
+	if name == "" {
+		return "未知模型"
+	}
+	return name
+}
+
 // getTimestampNormExpr 获取按粒度规范化时间戳的 SQL 表达式
 func getTimestampNormExpr(granularity string) string {
 	dbType := getDBType()
@@ -31,7 +39,7 @@ func getTimestampNormExpr(granularity string) string {
 		case "day":
 			return "UNIX_TIMESTAMP(DATE(FROM_UNIXTIME(created_at)))"
 		case "week":
-			return "UNIX_TIMESTAMP(DATE_SUB(FROM_UNIXTIME(created_at), INTERVAL WEEKDAY(FROM_UNIXTIME(created_at)) DAY))"
+			return "UNIX_TIMESTAMP(DATE(FROM_UNIXTIME(created_at)))"
 		case "month":
 			return "UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(created_at), '%Y-%m-01'))"
 		default:
@@ -42,7 +50,7 @@ func getTimestampNormExpr(granularity string) string {
 		case "day":
 			return "EXTRACT(EPOCH FROM DATE(TO_TIMESTAMP(created_at)))"
 		case "week":
-			return "EXTRACT(EPOCH FROM DATE_TRUNC('week', TO_TIMESTAMP(created_at)))"
+			return "EXTRACT(EPOCH FROM DATE(TO_TIMESTAMP(created_at)))"
 		case "month":
 			return "EXTRACT(EPOCH FROM DATE_TRUNC('month', TO_TIMESTAMP(created_at)))"
 		default:
@@ -53,7 +61,7 @@ func getTimestampNormExpr(granularity string) string {
 		case "day":
 			return "strftime('%s', DATE(created_at, 'unixepoch'))"
 		case "week":
-			return "strftime('%s', DATE(created_at - (CAST(created_at AS INTEGER) % 604800), 'unixepoch'))"
+			return "strftime('%s', DATE(created_at, 'unixepoch'))"
 		case "month":
 			return "strftime('%s', strftime('%Y-%m-01', created_at, 'unixepoch'))"
 		default:
@@ -70,7 +78,8 @@ func NormalizeTimestamp(ts int64, granularity string) int64 {
 	case "day":
 		return ts - (ts % 86400)
 	case "week":
-		return ts - (ts % 604800)
+		// 周模式按照最近7天窗口展示，仍以天为最小粒度返回趋势数据
+		return ts - (ts % 86400)
 	case "month":
 		t := time.Unix(ts, 0)
 		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location()).Unix()
@@ -81,7 +90,6 @@ func NormalizeTimestamp(ts int64, granularity string) int64 {
 
 // GetUserUsageOverview 获取所有用户的用量概览
 func GetUserUsageOverview(startTimestamp, endTimestamp int64, granularity string) ([]dto.UserUsageOverview, error) {
-	// 1. 从 quota_data 获取用户维度的用量汇总
 	type userStat struct {
 		UserID      int    `gorm:"column:user_id"`
 		Username    string `gorm:"column:username"`
@@ -100,20 +108,26 @@ func GetUserUsageOverview(startTimestamp, endTimestamp int64, granularity string
 	if err != nil {
 		return nil, fmt.Errorf("查询用户用量汇总失败: %w", err)
 	}
-
 	if len(userStats) == 0 {
 		return []dto.UserUsageOverview{}, nil
 	}
 
-	// 收集所有用户 ID
+	overviewMap := make(map[int]*dto.UserUsageOverview, len(userStats))
 	userIDs := make([]int, 0, len(userStats))
-	userStatMap := make(map[int]*userStat)
-	for i := range userStats {
-		userIDs = append(userIDs, userStats[i].UserID)
-		userStatMap[userStats[i].UserID] = &userStats[i]
+	for _, us := range userStats {
+		item := &dto.UserUsageOverview{
+			UserID:      us.UserID,
+			Username:    us.Username,
+			TotalCount:  us.TotalCount,
+			TotalQuota:  us.TotalQuota,
+			TotalTokens: us.TotalTokens,
+			TimeSeries:  []dto.TimeSeriesItem{},
+		}
+		overviewMap[us.UserID] = item
+		userIDs = append(userIDs, us.UserID)
 	}
 
-	// 2. 从 logs 表获取错误统计（type=5）
+	// 错误统计：仅统计真正的错误日志 type=5
 	type errorStat struct {
 		UserID     int `gorm:"column:user_id"`
 		ErrorCount int `gorm:"column:error_count"`
@@ -121,46 +135,70 @@ func GetUserUsageOverview(startTimestamp, endTimestamp int64, granularity string
 	var errorStats []errorStat
 	err = DB.Table("logs").
 		Select("user_id, COUNT(*) as error_count").
-		Where("user_id IN ? AND type = 5 AND created_at >= ? AND created_at <= ?", userIDs, startTimestamp, endTimestamp).
+		Where("user_id IN ? AND type = ? AND created_at >= ? AND created_at <= ?", userIDs, LogTypeError, startTimestamp, endTimestamp).
 		Group("user_id").
 		Find(&errorStats).Error
-	if err != nil {
-		common.SysError("查询用户错误统计失败: " + err.Error())
+	if err == nil {
+		for _, es := range errorStats {
+			if item, ok := overviewMap[es.UserID]; ok {
+				item.ErrorCount = es.ErrorCount
+			}
+		}
 	}
 
-	errorMap := make(map[int]int)
-	for _, es := range errorStats {
-		errorMap[es.UserID] = es.ErrorCount
+	// 用户时间序列：用于主看板趋势和 sparkline
+	type seriesRow struct {
+		UserID    int   `gorm:"column:user_id"`
+		Timestamp int64 `gorm:"column:timestamp"`
+		Count     int   `gorm:"column:count"`
+		Quota     int   `gorm:"column:quota"`
+		Tokens    int   `gorm:"column:tokens"`
+	}
+	normExpr := getTimestampNormExpr(granularity)
+	seriesSQL := fmt.Sprintf(`
+		SELECT
+			user_id,
+			%s as timestamp,
+			SUM(count) as count,
+			SUM(quota) as quota,
+			SUM(token_used) as tokens
+		FROM quota_data
+		WHERE created_at >= ? AND created_at <= ?
+		GROUP BY user_id, %s
+		ORDER BY timestamp ASC
+	`, normExpr, normExpr)
+	var seriesRows []seriesRow
+	err = DB.Raw(seriesSQL, startTimestamp, endTimestamp).Scan(&seriesRows).Error
+	if err == nil {
+		for _, row := range seriesRows {
+			if item, ok := overviewMap[row.UserID]; ok {
+				item.TimeSeries = append(item.TimeSeries, dto.TimeSeriesItem{
+					Timestamp: row.Timestamp,
+					Count:     row.Count,
+					Quota:     row.Quota,
+					Tokens:    row.Tokens,
+				})
+			}
+		}
 	}
 
-	// 3. 构建返回数据
 	overviews := make([]dto.UserUsageOverview, 0, len(userStats))
 	for _, us := range userStats {
-		overview := dto.UserUsageOverview{
-			UserID:      us.UserID,
-			Username:    us.Username,
-			TotalCount:  us.TotalCount,
-			TotalQuota:  us.TotalQuota,
-			TotalTokens: us.TotalTokens,
-			ErrorCount:  errorMap[us.UserID],
+		if item, ok := overviewMap[us.UserID]; ok {
+			overviews = append(overviews, *item)
 		}
-		overviews = append(overviews, overview)
 	}
-
 	return overviews, nil
 }
 
 // GetUserUsageDetail 获取指定用户的用量详情
 func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granularity string) (*dto.UserUsageDetail, error) {
 	detail := &dto.UserUsageDetail{}
-
-	// 1. 获取用户基本信息
 	user, err := GetUserById(userID, false)
 	if err != nil {
 		return nil, fmt.Errorf("获取用户信息失败: %w", err)
 	}
 
-	// 2. 从 logs 表聚合消费日志 (type=2) 和错误日志
 	type summaryStat struct {
 		TotalCount   int `gorm:"column:total_count"`
 		TotalQuota   int `gorm:"column:total_quota"`
@@ -168,14 +206,13 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 		ErrorCount   int `gorm:"column:error_count"`
 		TotalUseTime int `gorm:"column:total_use_time"`
 	}
-
 	var summary summaryStat
 	err = DB.Table("logs").
 		Select(`
 			SUM(CASE WHEN type = 2 THEN 1 ELSE 0 END) as total_count,
 			SUM(CASE WHEN type = 2 THEN quota ELSE 0 END) as total_quota,
 			SUM(CASE WHEN type = 2 THEN prompt_tokens + completion_tokens ELSE 0 END) as total_tokens,
-			SUM(CASE WHEN type != 2 THEN 1 ELSE 0 END) as error_count,
+			SUM(CASE WHEN type = 5 THEN 1 ELSE 0 END) as error_count,
 			SUM(CASE WHEN type = 2 THEN use_time ELSE 0 END) as total_use_time
 		`).
 		Where("user_id = ? AND created_at >= ? AND created_at <= ?", userID, startTimestamp, endTimestamp).
@@ -183,12 +220,10 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 	if err != nil {
 		return nil, fmt.Errorf("查询用量汇总失败: %w", err)
 	}
-
 	avgUseMs := 0
 	if summary.TotalCount > 0 {
 		avgUseMs = (summary.TotalUseTime * 1000) / summary.TotalCount
 	}
-
 	detail.Summary = dto.UserUsageSummary{
 		UserID:       userID,
 		Username:     user.Username,
@@ -200,7 +235,6 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 		AvgUseTimeMs: avgUseMs,
 	}
 
-	// 3. 模型分布
 	type modelStat struct {
 		ModelName        string `gorm:"column:model_name"`
 		Count            int    `gorm:"column:count"`
@@ -209,7 +243,6 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 		CompletionTokens int    `gorm:"column:completion_tokens"`
 		ErrorCount       int    `gorm:"column:error_count"`
 	}
-
 	var modelStats []modelStat
 	err = DB.Table("logs").
 		Select(`
@@ -218,7 +251,7 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 			SUM(CASE WHEN type = 2 THEN quota ELSE 0 END) as quota,
 			SUM(CASE WHEN type = 2 THEN prompt_tokens ELSE 0 END) as prompt_tokens,
 			SUM(CASE WHEN type = 2 THEN completion_tokens ELSE 0 END) as completion_tokens,
-			SUM(CASE WHEN type != 2 THEN 1 ELSE 0 END) as error_count
+			SUM(CASE WHEN type = 5 THEN 1 ELSE 0 END) as error_count
 		`).
 		Where("user_id = ? AND created_at >= ? AND created_at <= ?", userID, startTimestamp, endTimestamp).
 		Group("model_name").
@@ -227,11 +260,13 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 	if err != nil {
 		common.SysError("查询模型分布失败: " + err.Error())
 	}
-
 	detail.ModelDistribution = make([]dto.ModelDistribution, 0, len(modelStats))
 	for _, ms := range modelStats {
+		if ms.Count == 0 && ms.ErrorCount == 0 && ms.Quota == 0 && ms.PromptTokens == 0 && ms.CompletionTokens == 0 {
+			continue
+		}
 		detail.ModelDistribution = append(detail.ModelDistribution, dto.ModelDistribution{
-			ModelName:        ms.ModelName,
+			ModelName:        normalizeModelName(ms.ModelName),
 			Count:            ms.Count,
 			Quota:            ms.Quota,
 			PromptTokens:     ms.PromptTokens,
@@ -240,7 +275,6 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 		})
 	}
 
-	// 4. 时间分布（按粒度聚合）
 	normExpr := getTimestampNormExpr(granularity)
 	type timeStat struct {
 		Timestamp    int64 `gorm:"column:timestamp"`
@@ -249,7 +283,6 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 		Tokens       int   `gorm:"column:tokens"`
 		TotalUseTime int   `gorm:"column:total_use_time"`
 	}
-
 	timeSQL := fmt.Sprintf(`
 		SELECT
 			%s as timestamp,
@@ -262,14 +295,12 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 		GROUP BY %s
 		ORDER BY timestamp ASC
 	`, normExpr, normExpr)
-
 	var timeStatsRaw []timeStat
 	err = DB.Raw(timeSQL, userID, startTimestamp, endTimestamp).Scan(&timeStatsRaw).Error
 	if err != nil {
 		common.SysError("查询时间分布失败: " + err.Error())
 		timeStatsRaw = []timeStat{}
 	}
-
 	detail.TimeDistribution = make([]dto.TimeSeriesItem, 0, len(timeStatsRaw))
 	for _, ts := range timeStatsRaw {
 		avgMs := 0
@@ -285,93 +316,58 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 		})
 	}
 
-	// 5. 错误分布（所有非 type=2 的记录）
 	dbType := getDBType()
 	subFunc := "SUBSTRING"
 	if dbType == "sqlite" {
 		subFunc = "substr"
 	}
-	// PostgreSQL 用 LEFT 替代 SUBSTRING
 	if dbType == "postgres" {
 		subFunc = "LEFT"
 	}
-
 	type errorStat struct {
 		ModelName    string `gorm:"column:model_name"`
 		ErrorContent string `gorm:"column:error_content"`
 		Count        int    `gorm:"column:count"`
 		LatestAt     int64  `gorm:"column:latest_at"`
 	}
-
 	var errorSQL string
 	if dbType == "postgres" {
-		// PostgreSQL 用 LEFT(content, 200)
-		errorSQL = fmt.Sprintf(`
-			SELECT
-				model_name,
-				LEFT(content, 200) as error_content,
-				COUNT(*) as count,
-				MAX(created_at) as latest_at
+		errorSQL = `
+			SELECT model_name, LEFT(content, 200) as error_content, COUNT(*) as count, MAX(created_at) as latest_at
 			FROM logs
-			WHERE user_id = ? AND type != 2 AND created_at >= ? AND created_at <= ?
+			WHERE user_id = ? AND type = 5 AND created_at >= ? AND created_at <= ?
 			GROUP BY model_name, LEFT(content, 200)
 			ORDER BY count DESC
 			LIMIT 50
-		`)
+		`
 	} else {
 		errorSQL = fmt.Sprintf(`
-			SELECT
-				model_name,
-				%s(content, 1, 200) as error_content,
-				COUNT(*) as count,
-				MAX(created_at) as latest_at
+			SELECT model_name, %s(content, 1, 200) as error_content, COUNT(*) as count, MAX(created_at) as latest_at
 			FROM logs
-			WHERE user_id = ? AND type != 2 AND created_at >= ? AND created_at <= ?
+			WHERE user_id = ? AND type = 5 AND created_at >= ? AND created_at <= ?
 			GROUP BY model_name, %s(content, 1, 200)
 			ORDER BY count DESC
 			LIMIT 50
 		`, subFunc, subFunc)
 	}
-
 	var errorStats []errorStat
 	err = DB.Raw(errorSQL, userID, startTimestamp, endTimestamp).Scan(&errorStats).Error
 	if err != nil {
 		common.SysError("查询错误分布失败: " + err.Error())
 		errorStats = []errorStat{}
 	}
-
-	// 聚合相同 model_name + 截断内容的错误
-	errorMap := make(map[string]*dto.ErrorDistribution)
+	detail.ErrorDistribution = make([]dto.ErrorDistribution, 0, len(errorStats))
 	for _, es := range errorStats {
-		key := es.ModelName + "|" + es.ErrorContent
-		if existing, ok := errorMap[key]; ok {
-			existing.Count += es.Count
-			if es.LatestAt > existing.LatestAt {
-				existing.LatestAt = es.LatestAt
-			}
-		} else {
-			errorMap[key] = &dto.ErrorDistribution{
-				ModelName:    es.ModelName,
-				ErrorContent: es.ErrorContent,
-				Count:        es.Count,
-				LatestAt:     es.LatestAt,
-			}
-		}
+		detail.ErrorDistribution = append(detail.ErrorDistribution, dto.ErrorDistribution{
+			ModelName:    normalizeModelName(es.ModelName),
+			ErrorContent: es.ErrorContent,
+			Count:        es.Count,
+			LatestAt:     es.LatestAt,
+		})
 	}
-
-	detail.ErrorDistribution = make([]dto.ErrorDistribution, 0, len(errorMap))
-	for _, ed := range errorMap {
-		detail.ErrorDistribution = append(detail.ErrorDistribution, *ed)
-	}
-
-	// 按错误次数降序排序
-	for i := 0; i < len(detail.ErrorDistribution); i++ {
-		for j := i + 1; j < len(detail.ErrorDistribution); j++ {
-			if detail.ErrorDistribution[j].Count > detail.ErrorDistribution[i].Count {
-				detail.ErrorDistribution[i], detail.ErrorDistribution[j] = detail.ErrorDistribution[j], detail.ErrorDistribution[i]
-			}
-		}
-	}
+	sort.Slice(detail.ErrorDistribution, func(i, j int) bool {
+		return detail.ErrorDistribution[i].Count > detail.ErrorDistribution[j].Count
+	})
 
 	return detail, nil
 }
