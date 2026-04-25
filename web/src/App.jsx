@@ -45,6 +45,7 @@ import ModelPage from './pages/Model';
 import ModelDeploymentPage from './pages/ModelDeployment';
 import Playground from './pages/Playground';
 import Subscription from './pages/Subscription';
+import UserUsageDashboard from './pages/UserUsageDashboard';
 import OAuth2Callback from './components/auth/OAuth2Callback';
 import PersonalSetting from './components/settings/PersonalSetting';
 import Setup from './pages/Setup';
@@ -313,6 +314,16 @@ function App() {
                 <Task />
               </Suspense>
             </PrivateRoute>
+          }
+        />
+        <Route
+          path='/user-usage'
+          element={
+            <AdminRoute>
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <UserUsageDashboard />
+              </Suspense>
+            </AdminRoute>
           }
         />
         <Route

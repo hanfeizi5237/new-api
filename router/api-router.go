@@ -379,5 +379,13 @@ func SetApiRouter(router *gin.Engine) {
 			deploymentsRoute.POST("/:id/extend", controller.ExtendDeployment)
 			deploymentsRoute.DELETE("/:id", controller.DeleteDeployment)
 		}
+		// User Usage Dashboard (admin only)
+		adminUsageRoute := apiRouter.Group("/admin/usage")
+		adminUsageRoute.Use(middleware.AdminAuth())
+		{
+			adminUsageRoute.GET("/overview", controller.GetUserUsageOverview)
+			adminUsageRoute.GET("/detail", controller.GetUserUsageDetail)
+			adminUsageRoute.GET("/timeseries", controller.GetGlobalTimeSeries)
+		}
 	}
 }
