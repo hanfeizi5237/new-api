@@ -28,14 +28,13 @@ export const GRANULARITY_OPTIONS = [
   { label: '月', value: 'month' },
 ];
 
-// ========== 默认时间范围（最近7天） ==========
+// ========== 默认时间范围（当前日） ==========
 export const DEFAULT_DATE_RANGE = () => {
   const now = new Date();
-  const start = new Date(now);
-  start.setDate(start.getDate() - 7);
+  const today = now.toISOString().split('T')[0];
   return {
-    start: start.toISOString().split('T')[0],
-    end: now.toISOString().split('T')[0],
+    start: today,
+    end: today,
   };
 };
 
