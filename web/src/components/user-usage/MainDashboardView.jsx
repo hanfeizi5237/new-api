@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React from 'react';
-import { Card, Button, Table, Tag, Typography, DatePicker } from '@douyinfe/semi-ui';
+import { Card, Button, Table, Tag, Typography, Form } from '@douyinfe/semi-ui';
 import {
   Users,
   Activity,
@@ -128,16 +128,17 @@ const MainDashboardView = ({
     <div className='space-y-4'>
       {/* 顶部工具栏 */}
       <div className='flex flex-wrap items-center gap-3'>
-        <DatePicker.RangePicker
-          value={[dateRange.start, dateRange.end]}
+        <Form.DatePicker
+          field='dateRange'
+          type='dateRange'
+          placeholder={['开始日期', '结束日期']}
+          showClear
+          style={{ width: 240 }}
           onChange={(dates) => {
             if (dates && dates.length === 2) {
               handleDateRangeChange({ start: dates[0], end: dates[1] });
             }
           }}
-          type='date'
-          placeholder={['开始日期', '结束日期']}
-          style={{ width: 240 }}
         />
 
         <select

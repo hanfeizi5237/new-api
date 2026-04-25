@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React from 'react';
-import { Drawer, Card, Table, Tag, Typography, Progress, Empty, Spin, Tabs } from '@douyinfe/semi-ui';
+import { SideSheet, Card, Table, Tag, Typography, Progress, Empty, Spin, Tabs } from '@douyinfe/semi-ui';
 import {
   IllustrationConstruction,
   IllustrationConstructionDark,
@@ -76,7 +76,7 @@ const UserDetailView = ({
   };
 
   return (
-    <Drawer
+    <SideSheet
       visible={drawerVisible}
       onCancel={closeUserDetail}
       onClose={closeUserDetail}
@@ -148,7 +148,7 @@ const UserDetailView = ({
           </Tabs.TabPane>
         ))}
       </Tabs>
-    </Drawer>
+    </SideSheet>
   );
 };
 
