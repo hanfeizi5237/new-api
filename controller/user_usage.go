@@ -140,3 +140,34 @@ func GetGlobalTimeSeries(c *gin.Context) {
 		"data":    data,
 	})
 }
+
+// GetGlobalTimeSeriesByModel 获取按模型拆分的全局时间序列数据
+func GetGlobalTimeSeriesByModel(c *gin.Context) {
+	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	granularity := c.DefaultQuery("granularity", "day")
+
+	if startTimestamp == 0 || endTimestamp == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "start_timestamp 和 end_timestamp 为必填参数",
+		})
+		return
+	}
+
+	if granularity != "day" && granularity != "week" && granularity != "month" {
+		granularity = "day"
+	}
+
+	data, err := model.GetTimeSeriesDataByModel(startTimestamp, endTimestamp, granularity)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    data,
+	})
+}

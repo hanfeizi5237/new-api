@@ -386,6 +386,7 @@ func SetApiRouter(router *gin.Engine) {
 			adminUsageRoute.GET("/overview", controller.GetUserUsageOverview)
 			adminUsageRoute.GET("/detail", controller.GetUserUsageDetail)
 			adminUsageRoute.GET("/timeseries", controller.GetGlobalTimeSeries)
+			adminUsageRoute.GET("/timeseries-by-model", controller.GetGlobalTimeSeriesByModel)
 		}
 	}
 }

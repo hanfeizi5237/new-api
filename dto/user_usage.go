@@ -58,3 +58,11 @@ type ErrorDistribution struct {
 	Count        int    `json:"count"`
 	LatestAt     int64  `json:"latest_at"`
 }
+
+// ModelTimeSeriesItem 按模型拆分的时间序列数据
+type ModelTimeSeriesItem struct {
+	Timestamp int64  `json:"timestamp"`
+	ModelName string `json:"model_name"`
+	Quota     int    `json:"quota"`
+	Tokens    int    `json:"tokens"`
+}

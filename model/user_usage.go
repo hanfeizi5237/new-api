@@ -328,3 +328,30 @@ func GetTimeSeriesData(startTimestamp, endTimestamp int64, granularity string) (
 	}
 	return result, nil
 }
+
+// GetTimeSeriesDataByModel 获取按模型拆分的时间序列数据
+func GetTimeSeriesDataByModel(startTimestamp, endTimestamp int64, granularity string) ([]dto.ModelTimeSeriesItem, error) {
+	normExpr := getTimestampNormExpr(granularity)
+	type modelTimeStat struct {
+		Timestamp int64  `gorm:"column:timestamp"`
+		ModelName string `gorm:"column:model_name"`
+		Quota     int    `gorm:"column:quota"`
+		Tokens    int    `gorm:"column:tokens"`
+	}
+	rawSQL := fmt.Sprintf(`SELECT %s as timestamp, model_name, SUM(quota) as quota, SUM(token_used) as tokens FROM quota_data WHERE created_at >= ? AND created_at <= ? AND model_name != '' GROUP BY %s, model_name ORDER BY timestamp ASC`, normExpr, normExpr)
+	var stats []modelTimeStat
+	err := DB.Raw(rawSQL, startTimestamp, endTimestamp).Scan(&stats).Error
+	if err != nil {
+		return nil, fmt.Errorf("查询按模型拆分的时间序列数据失败: %w", err)
+	}
+	result := make([]dto.ModelTimeSeriesItem, 0, len(stats))
+	for _, s := range stats {
+		result = append(result, dto.ModelTimeSeriesItem{
+			Timestamp: s.Timestamp,
+			ModelName: normalizeModelName(s.ModelName),
+			Quota:     s.Quota,
+			Tokens:    s.Tokens,
+		})
+	}
+	return result, nil
+}

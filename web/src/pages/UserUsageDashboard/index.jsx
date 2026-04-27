@@ -35,6 +35,7 @@ const UserUsageDashboard = () => {
     loading,
     overviewData,
     globalTimeSeries,
+    globalTimeSeriesByModel,
     granularity,
     dateRange,
     drawerVisible,
@@ -60,9 +61,9 @@ const UserUsageDashboard = () => {
 
   useEffect(() => {
     if (overviewData.length > 0) {
-      charts.updateOverviewCharts(overviewData, globalTimeSeries);
+      charts.updateOverviewCharts(overviewData, globalTimeSeries, globalTimeSeriesByModel);
     }
-  }, [overviewData, globalTimeSeries]);
+  }, [overviewData, globalTimeSeries, globalTimeSeriesByModel]);
 
   useEffect(() => {
     if (detailData) {

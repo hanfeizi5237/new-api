@@ -46,7 +46,9 @@ export const useUserUsageData = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [overviewData, setOverviewData] = useState([]);
   const [detailData, setDetailData] = useState(null);
+  
   const [globalTimeSeries, setGlobalTimeSeries] = useState([]);
+  const [globalTimeSeriesByModel, setGlobalTimeSeriesByModel] = useState([]);
   const [dateRange, setDateRange] = useState(DEFAULT_DATE_RANGE());
   const [granularity, setGranularity] = useState('day');
   const [selectedUser, setSelectedUser] = useState(null);
@@ -88,9 +90,10 @@ export const useUserUsageData = () => {
     setLoading(true);
     try {
       const { startTs, endTs } = dateRangeToTimestamps(range);
-      const [overviewRes, seriesRes] = await Promise.all([
+      const [overviewRes, seriesRes, seriesByModelRes] = await Promise.all([
         API.get(`/api/admin/usage/overview?start_timestamp=${startTs}&end_timestamp=${endTs}&granularity=${granularityValue}`, { signal: controller.signal }),
         API.get(`/api/admin/usage/timeseries?start_timestamp=${startTs}&end_timestamp=${endTs}&granularity=day`, { signal: controller.signal }),
+        API.get(`/api/admin/usage/timeseries-by-model?start_timestamp=${startTs}&end_timestamp=${endTs}&granularity=day`, { signal: controller.signal }),
       ]);
 
       if (overviewRes.data.success) {
@@ -105,11 +108,18 @@ export const useUserUsageData = () => {
       } else {
         setGlobalTimeSeries([]);
       }
+
+      if (seriesByModelRes.data.success) {
+        setGlobalTimeSeriesByModel(seriesByModelRes.data.data || []);
+      } else {
+        setGlobalTimeSeriesByModel([]);
+      }
     } catch (err) {
       if (err.name !== 'AbortError') {
         showError('加载概览数据失败: ' + err.message);
         setOverviewData([]);
         setGlobalTimeSeries([]);
+        setGlobalTimeSeriesByModel([]);
       }
     } finally {
       setLoading(false);
@@ -203,6 +213,7 @@ export const useUserUsageData = () => {
     overviewData,
     detailData,
     globalTimeSeries,
+    globalTimeSeriesByModel,
     dateRange,
     granularity,
     selectedUser,
