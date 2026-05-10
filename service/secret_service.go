@@ -35,10 +35,16 @@ func CreateSellerSecret(input CreateSellerSecretInput, actorUserId int, reason s
 
 	seller, err := model.GetSellerByID(input.SellerId)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("seller not found")
+		}
 		return nil, err
 	}
 	supply, err := model.GetSupplyAccountByID(input.SupplyAccountId)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("supply_account not found")
+		}
 		return nil, err
 	}
 	if supply.SellerId != seller.Id {

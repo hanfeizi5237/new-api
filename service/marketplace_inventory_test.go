@@ -3,8 +3,48 @@ package service
 import (
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 )
+
+func TestLockForUpdateSkipsSQLiteAndLocksOtherDialects(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+
+	previousSQLite := common.UsingSQLite
+	previousMySQL := common.UsingMySQL
+	previousPostgreSQL := common.UsingPostgreSQL
+	t.Cleanup(func() {
+		common.UsingSQLite = previousSQLite
+		common.UsingMySQL = previousMySQL
+		common.UsingPostgreSQL = previousPostgreSQL
+	})
+
+	common.UsingSQLite = true
+	common.UsingMySQL = false
+	common.UsingPostgreSQL = false
+	sqliteQuery := lockForUpdate(db.Model(&model.SupplyAccount{}))
+	if _, exists := sqliteQuery.Get("gorm:query_option"); exists {
+		t.Fatalf("expected sqlite query to skip FOR UPDATE")
+	}
+
+	common.UsingSQLite = false
+	common.UsingMySQL = true
+	common.UsingPostgreSQL = false
+	mysqlQuery := lockForUpdate(db.Model(&model.SupplyAccount{}))
+	value, exists := mysqlQuery.Get("gorm:query_option")
+	if !exists || value != "FOR UPDATE" {
+		t.Fatalf("expected mysql query to set FOR UPDATE, got exists=%v value=%v", exists, value)
+	}
+
+	common.UsingSQLite = false
+	common.UsingMySQL = false
+	common.UsingPostgreSQL = true
+	postgresQuery := lockForUpdate(db.Model(&model.SupplyAccount{}))
+	value, exists = postgresQuery.Get("gorm:query_option")
+	if !exists || value != "FOR UPDATE" {
+		t.Fatalf("expected postgres query to set FOR UPDATE, got exists=%v value=%v", exists, value)
+	}
+}
 
 func TestSyncMarketplaceInventoryMarksListingSoldOutWhenNoSKUCanBeSatisfied(t *testing.T) {
 	db := setupMarketplaceServiceTestDB(t)

@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/service"
@@ -27,7 +29,15 @@ func GetMarketEntitlements(c *gin.Context) {
 
 func GetMarketEntitlementsAdmin(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
-	buyerUserId, _ := strconv.Atoi(c.Query("buyer_user_id"))
+	buyerUserId := 0
+	if rawBuyerUserID := strings.TrimSpace(c.Query("buyer_user_id")); rawBuyerUserID != "" {
+		parsedBuyerUserID, err := strconv.Atoi(rawBuyerUserID)
+		if err != nil || parsedBuyerUserID <= 0 {
+			common.ApiError(c, errors.New("invalid buyer_user_id"))
+			return
+		}
+		buyerUserId = parsedBuyerUserID
+	}
 	entitlements, total, err := service.ListEntitlementsAdmin(
 		buyerUserId,
 		c.Query("model_name"),

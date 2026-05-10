@@ -38,6 +38,8 @@ type CompleteMarketOrderPaymentInput struct {
 	ProviderPayload    string
 }
 
+var grantEntitlementsForOrderTxFunc = grantEntitlementsForOrderTx
+
 type FailMarketOrderPaymentInput struct {
 	OrderNo            string
 	PaymentMethod      string
@@ -127,6 +129,8 @@ func CompleteMarketOrderPayment(input CompleteMarketOrderPaymentInput) (*model.M
 	}
 
 	var completedOrder *model.MarketOrder
+	var completedItems []model.MarketOrderItem
+	var grantErr error
 	err := model.DB.Transaction(func(tx *gorm.DB) error {
 		var order model.MarketOrder
 		if err := lockForUpdate(tx).
@@ -155,6 +159,7 @@ func CompleteMarketOrderPayment(input CompleteMarketOrderPaymentInput) (*model.M
 		if err != nil {
 			return err
 		}
+		completedItems = append(completedItems[:0], items...)
 		paidAt := order.PaidAt
 		if paidAt <= 0 {
 			paidAt = common.GetTimestamp()
@@ -207,7 +212,7 @@ func CompleteMarketOrderPayment(input CompleteMarketOrderPaymentInput) (*model.M
 		if err := tx.Save(&order).Error; err != nil {
 			return err
 		}
-		if err := grantEntitlementsForOrderTx(tx, &order, items); err != nil {
+		if err := grantEntitlementsForOrderTxFunc(tx, &order, items); err != nil {
 			if saveErr := tx.Model(&model.MarketOrder{}).
 				Where("id = ?", order.Id).
 				Updates(map[string]interface{}{
@@ -216,7 +221,10 @@ func CompleteMarketOrderPayment(input CompleteMarketOrderPaymentInput) (*model.M
 				}).Error; saveErr != nil {
 				return saveErr
 			}
-			return err
+			order.EntitlementStatus = marketEntitlementStatusFailed
+			completedOrder = &order
+			grantErr = err
+			return nil
 		}
 		completedOrder = &order
 		return nil
@@ -224,8 +232,11 @@ func CompleteMarketOrderPayment(input CompleteMarketOrderPaymentInput) (*model.M
 	if err != nil {
 		return nil, err
 	}
-	for _, item := range itemsForOrder(completedOrder) {
+	for _, item := range completedItems {
 		syncMarketplaceInventoryAfterMutation(item.SupplyAccountId, "payment_completed")
+	}
+	if grantErr != nil {
+		return completedOrder, grantErr
 	}
 	return completedOrder, nil
 }

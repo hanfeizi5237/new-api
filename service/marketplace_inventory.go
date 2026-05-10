@@ -9,10 +9,9 @@ import (
 // lockForUpdate wraps a GORM query with FOR UPDATE, skipping it for SQLite
 // which doesn't support row-level locking.
 func lockForUpdate(query *gorm.DB) *gorm.DB {
-	if common.UsingSQLite || common.UsingMySQL || common.UsingPostgreSQL {
-		// SQLite doesn't support FOR UPDATE; MySQL/PostgreSQL row locks
-		// handle concurrency, but the atomic SQL patterns (P0 #4) are
-		// the primary defense against overselling.
+	if common.UsingSQLite {
+		// SQLite doesn't support FOR UPDATE; callers rely on atomic UPDATE
+		// patterns there and row locks everywhere else.
 		return query
 	}
 	return query.Set("gorm:query_option", "FOR UPDATE")

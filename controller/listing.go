@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -27,7 +29,15 @@ type ListingAdminView struct {
 
 func GetListingAdmin(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
-	sellerId, _ := strconv.Atoi(c.Query("seller_id"))
+	sellerId := 0
+	if rawSellerID := strings.TrimSpace(c.Query("seller_id")); rawSellerID != "" {
+		parsedSellerID, err := strconv.Atoi(rawSellerID)
+		if err != nil || parsedSellerID <= 0 {
+			common.ApiError(c, errors.New("invalid seller_id"))
+			return
+		}
+		sellerId = parsedSellerID
+	}
 	listings, total, err := service.ListListings(
 		c.Query("keyword"),
 		c.Query("status"),
@@ -81,6 +91,10 @@ func UpdateListingAdminStatus(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	if id <= 0 {
+		common.ApiError(c, errors.New("invalid listing id"))
 		return
 	}
 	var req UpdateListingStatusRequest

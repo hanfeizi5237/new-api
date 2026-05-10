@@ -197,3 +197,26 @@ func TestListingAdminRejectsInvalidStatusTransitions(t *testing.T) {
 		t.Fatalf("expected invalid listing status to fail")
 	}
 }
+
+func TestListingAdminRejectsInvalidSellerIDQueryAndPathID(t *testing.T) {
+	listCtx, listRecorder := newMarketplaceContext(t, http.MethodGet, "/api/listing/admin?seller_id=0", nil, 1)
+	GetListingAdmin(listCtx)
+	listResp := decodeMarketplaceResponse(t, listRecorder)
+	if listResp.Success {
+		t.Fatalf("expected invalid seller_id query to fail")
+	}
+	if listResp.Message != "invalid seller_id" {
+		t.Fatalf("expected invalid seller_id message, got %q", listResp.Message)
+	}
+
+	updateCtx, updateRecorder := newMarketplaceContext(t, http.MethodPut, "/api/listing/admin/0/status", UpdateListingStatusRequest{}, 1)
+	updateCtx.Params = gin.Params{{Key: "id", Value: "0"}}
+	UpdateListingAdminStatus(updateCtx)
+	updateResp := decodeMarketplaceResponse(t, updateRecorder)
+	if updateResp.Success {
+		t.Fatalf("expected invalid listing id to fail")
+	}
+	if updateResp.Message != "invalid listing id" {
+		t.Fatalf("expected invalid listing id message, got %q", updateResp.Message)
+	}
+}

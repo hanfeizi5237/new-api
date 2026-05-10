@@ -367,6 +367,7 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		recordQuotaUsage(relayInfo, summary.Quota)
 	}
 
+	captureMarketplaceEntitlementUsageSummary(relayInfo, summary)
 	if err := SettleBilling(ctx, relayInfo, summary.Quota); err != nil {
 		logger.LogError(ctx, "error settling billing: "+err.Error())
 	}
@@ -470,4 +471,19 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		Group:            relayInfo.UsingGroup,
 		Other:            other,
 	})
+}
+
+func captureMarketplaceEntitlementUsageSummary(relayInfo *relaycommon.RelayInfo, summary textQuotaSummary) {
+	if relayInfo == nil || relayInfo.Billing == nil {
+		return
+	}
+	billingSession, ok := relayInfo.Billing.(*BillingSession)
+	if !ok {
+		return
+	}
+	funding, ok := billingSession.funding.(*MarketplaceEntitlementFunding)
+	if !ok {
+		return
+	}
+	funding.captureUsageSummary(summary)
 }

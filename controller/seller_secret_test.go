@@ -138,3 +138,26 @@ func TestSellerSecretAdminCreateListAndVerifyMaskCiphertext(t *testing.T) {
 		t.Fatalf("expected operation logs for import/verify/disable/recover, got %d", verifyLogCount)
 	}
 }
+
+func TestSellerSecretAdminRejectsInvalidQueryAndPathIDs(t *testing.T) {
+	listCtx, listRecorder := newMarketplaceContext(t, http.MethodGet, "/api/marketplace/admin/seller-secrets?seller_id=0", nil, 1)
+	GetSellerSecretsAdmin(listCtx)
+	listResp := decodeMarketplaceResponse(t, listRecorder)
+	if listResp.Success {
+		t.Fatalf("expected invalid seller_id query to fail")
+	}
+	if listResp.Message != "invalid seller_id" {
+		t.Fatalf("expected invalid seller_id message, got %q", listResp.Message)
+	}
+
+	verifyCtx, verifyRecorder := newMarketplaceContext(t, http.MethodPost, "/api/marketplace/admin/seller-secrets/0/verify", nil, 1)
+	verifyCtx.Params = gin.Params{{Key: "id", Value: "0"}}
+	VerifySellerSecretAdmin(verifyCtx)
+	verifyResp := decodeMarketplaceResponse(t, verifyRecorder)
+	if verifyResp.Success {
+		t.Fatalf("expected invalid seller secret id to fail")
+	}
+	if verifyResp.Message != "invalid seller secret id" {
+		t.Fatalf("expected invalid seller secret id message, got %q", verifyResp.Message)
+	}
+}

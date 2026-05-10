@@ -160,6 +160,28 @@ func TestMarketStripeWebhookRejectsInvalidAmountTotal(t *testing.T) {
 	}
 }
 
+func TestMarketStripeWebhookRejectsOversizedBody(t *testing.T) {
+	_ = setupMarketplaceControllerTestDB(t)
+
+	previousSecret := setting.StripeWebhookSecret
+	setting.StripeWebhookSecret = "whsec_market_test"
+	t.Cleanup(func() {
+		setting.StripeWebhookSecret = previousSecret
+	})
+
+	oversizedPayload := bytes.Repeat([]byte("a"), int(marketplaceWebhookBodyLimitBytes)+1)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/market/payment/stripe/webhook", bytes.NewReader(oversizedPayload))
+	ctx.Request.Header.Set("Stripe-Signature", "invalid")
+
+	MarketStripeWebhook(ctx)
+
+	if recorder.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected oversized webhook body to return 413, got status=%d body=%q", recorder.Code, recorder.Body.String())
+	}
+}
+
 func configureMarketplaceEpayTest(t *testing.T) {
 	t.Helper()
 

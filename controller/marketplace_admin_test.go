@@ -153,3 +153,25 @@ func TestMarketEntitlementAdminList(t *testing.T) {
 		t.Fatalf("expected entitlement filters to match seeded entitlement, got %+v", page.Items[0])
 	}
 }
+
+func TestMarketplaceAdminRejectsInvalidBuyerUserIDQuery(t *testing.T) {
+	orderCtx, orderRecorder := newMarketplaceContext(t, http.MethodGet, "/api/marketplace/admin/orders?buyer_user_id=0", nil, 1)
+	GetMarketOrdersAdmin(orderCtx)
+	orderResp := decodeMarketplaceResponse(t, orderRecorder)
+	if orderResp.Success {
+		t.Fatalf("expected invalid buyer_user_id on order admin list to fail")
+	}
+	if orderResp.Message != "invalid buyer_user_id" {
+		t.Fatalf("expected invalid buyer_user_id message for order admin list, got %q", orderResp.Message)
+	}
+
+	entitlementCtx, entitlementRecorder := newMarketplaceContext(t, http.MethodGet, "/api/marketplace/admin/entitlements?buyer_user_id=0", nil, 1)
+	GetMarketEntitlementsAdmin(entitlementCtx)
+	entitlementResp := decodeMarketplaceResponse(t, entitlementRecorder)
+	if entitlementResp.Success {
+		t.Fatalf("expected invalid buyer_user_id on entitlement admin list to fail")
+	}
+	if entitlementResp.Message != "invalid buyer_user_id" {
+		t.Fatalf("expected invalid buyer_user_id message for entitlement admin list, got %q", entitlementResp.Message)
+	}
+}

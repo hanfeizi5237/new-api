@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -72,8 +74,24 @@ func toSellerSecretView(secret *model.SellerSecret) SellerSecretView {
 
 func GetSellerSecretsAdmin(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
-	sellerId, _ := strconv.Atoi(c.Query("seller_id"))
-	supplyAccountId, _ := strconv.Atoi(c.Query("supply_account_id"))
+	sellerId := 0
+	if rawSellerID := strings.TrimSpace(c.Query("seller_id")); rawSellerID != "" {
+		parsedSellerID, err := strconv.Atoi(rawSellerID)
+		if err != nil || parsedSellerID <= 0 {
+			common.ApiError(c, errors.New("invalid seller_id"))
+			return
+		}
+		sellerId = parsedSellerID
+	}
+	supplyAccountId := 0
+	if rawSupplyAccountID := strings.TrimSpace(c.Query("supply_account_id")); rawSupplyAccountID != "" {
+		parsedSupplyAccountID, err := strconv.Atoi(rawSupplyAccountID)
+		if err != nil || parsedSupplyAccountID <= 0 {
+			common.ApiError(c, errors.New("invalid supply_account_id"))
+			return
+		}
+		supplyAccountId = parsedSupplyAccountID
+	}
 	secrets, total, err := service.ListSellerSecrets(
 		sellerId,
 		supplyAccountId,
@@ -122,6 +140,10 @@ func VerifySellerSecretAdmin(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if id <= 0 {
+		common.ApiError(c, errors.New("invalid seller secret id"))
+		return
+	}
 	secret, err := service.VerifySellerSecret(id, c.GetInt("id"))
 	if err != nil {
 		common.ApiError(c, err)
@@ -134,6 +156,10 @@ func DisableSellerSecretAdmin(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	if id <= 0 {
+		common.ApiError(c, errors.New("invalid seller secret id"))
 		return
 	}
 	var req SellerSecretActionRequest
@@ -153,6 +179,10 @@ func RecoverSellerSecretAdmin(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	if id <= 0 {
+		common.ApiError(c, errors.New("invalid seller secret id"))
 		return
 	}
 	var req SellerSecretActionRequest

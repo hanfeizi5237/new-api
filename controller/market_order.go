@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -24,6 +26,15 @@ type PayMarketOrderRequest struct {
 type MarketOrderView struct {
 	Order *model.MarketOrder      `json:"order"`
 	Items []model.MarketOrderItem `json:"items"`
+}
+
+func isSupportedMarketPaymentMethod(method string) bool {
+	switch strings.TrimSpace(method) {
+	case model.PaymentMethodStripe, model.PaymentMethodCreem, model.PaymentMethodWaffo, "epay":
+		return true
+	default:
+		return false
+	}
 }
 
 func GetMarketListings(c *gin.Context) {
@@ -57,6 +68,10 @@ func GetMarketListing(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if id <= 0 {
+		common.ApiError(c, errors.New("invalid listing id"))
+		return
+	}
 	detail, err := service.GetPublicMarketListingDetail(id)
 	if err != nil {
 		common.ApiError(c, err)
@@ -69,6 +84,10 @@ func CreateMarketOrder(c *gin.Context) {
 	var req CreateMarketOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	if req.ListingId <= 0 || req.SkuId <= 0 || req.Quantity <= 0 {
+		common.ApiError(c, errors.New("listing_id, sku_id, and quantity must be positive"))
 		return
 	}
 	order, items, err := service.CreateMarketOrder(service.CreateMarketOrderInput{
@@ -116,7 +135,15 @@ func GetMarketOrders(c *gin.Context) {
 
 func GetMarketOrdersAdmin(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
-	buyerUserId, _ := strconv.Atoi(c.Query("buyer_user_id"))
+	buyerUserId := 0
+	if rawBuyerUserID := strings.TrimSpace(c.Query("buyer_user_id")); rawBuyerUserID != "" {
+		parsedBuyerUserID, err := strconv.Atoi(rawBuyerUserID)
+		if err != nil || parsedBuyerUserID <= 0 {
+			common.ApiError(c, errors.New("invalid buyer_user_id"))
+			return
+		}
+		buyerUserId = parsedBuyerUserID
+	}
 	orders, total, err := service.ListMarketOrdersAdmin(
 		c.Query("keyword"),
 		buyerUserId,
@@ -153,6 +180,10 @@ func GetMarketOrder(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if id <= 0 {
+		common.ApiError(c, errors.New("invalid order id"))
+		return
+	}
 	detail, err := service.GetBuyerMarketOrderDetail(id, c.GetInt("id"))
 	if err != nil {
 		common.ApiError(c, err)
@@ -170,9 +201,17 @@ func PayMarketOrder(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if id <= 0 {
+		common.ApiError(c, errors.New("invalid order id"))
+		return
+	}
 	var req PayMarketOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	if !isSupportedMarketPaymentMethod(req.PaymentMethod) {
+		common.ApiError(c, errors.New("invalid payment_method"))
 		return
 	}
 	intent, err := service.PrepareMarketOrderPayment(service.PrepareMarketOrderPaymentInput{

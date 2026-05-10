@@ -275,9 +275,21 @@ func TestPostTextConsumeQuotaMarketplaceBillingDoesNotIncreaseUserUsedQuota(t *t
 		},
 	}, nil)
 
-	reloadedBuyer, err := model.GetUserById(fixture.buyer.Id, true)
-	if err != nil {
-		t.Fatalf("failed to reload buyer: %v", err)
+	var reloadedBuyer *model.User
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		var err error
+		reloadedBuyer, err = model.GetUserById(fixture.buyer.Id, true)
+		if err != nil {
+			t.Fatalf("failed to reload buyer: %v", err)
+		}
+		if reloadedBuyer.RequestCount == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("marketplace post consume request count did not update in time, got %+v", reloadedBuyer)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 	if reloadedBuyer.UsedQuota != 4321 {
 		t.Fatalf("expected marketplace post consume not to change wallet used_quota, got %+v", reloadedBuyer)
@@ -292,6 +304,98 @@ func TestPostTextConsumeQuotaMarketplaceBillingDoesNotIncreaseUserUsedQuota(t *t
 	}
 	if lot.UsedAmount != 300 || lot.FrozenAmount != 0 {
 		t.Fatalf("expected entitlement lot to be settled from post text consume, got %+v", lot)
+	}
+
+	orderItem, err := getMarketOrderItemByID(fixture.lot.OrderItemId)
+	if err != nil {
+		t.Fatalf("failed to reload market order item: %v", err)
+	}
+	if orderItem.UsedAmount != 300 {
+		t.Fatalf("expected market order item used amount 300 after post text consume, got %+v", orderItem)
+	}
+
+	var ledger model.UsageLedger
+	if err := db.Where("request_id = ? AND ledger_status = ?", relayInfo.RequestId, "success").First(&ledger).Error; err != nil {
+		t.Fatalf("expected marketplace success usage ledger after post text consume, got error: %v", err)
+	}
+	if ledger.PromptTokens != 300 || ledger.CompletionTokens != 0 || ledger.TotalTokens != 300 {
+		t.Fatalf("expected usage ledger token details to be recorded, got %+v", ledger)
+	}
+	if ledger.OrderItemId != fixture.lot.OrderItemId || ledger.ActualQuota != 300 {
+		t.Fatalf("unexpected usage ledger settlement metadata: %+v", ledger)
+	}
+}
+
+func TestMarketplaceEntitlementFundingSettleRetryDoesNotDoubleCountUsage(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	ctx.Set("token_name", "marketplace-retry-token")
+
+	fixture := seedMarketplaceEntitlementBillingFixture(t, db, "market-buyer-settle-retry", 2000)
+
+	relayInfo := &relaycommon.RelayInfo{
+		UserId:          fixture.buyer.Id,
+		OriginModelName: fixture.supply.ModelName,
+		RequestId:       "req-marketplace-settle-retry-001",
+		TokenId:         1007,
+		TokenKey:        "market-token-settle-retry",
+		RelayMode:       relayconstant.RelayModeChatCompletions,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelId: fixture.channel.Id,
+		},
+		UserSetting: dto.UserSetting{
+			BillingPreference: "wallet_first",
+		},
+	}
+
+	session, apiErr := NewBillingSession(ctx, relayInfo, 300)
+	if apiErr != nil {
+		t.Fatalf("expected marketplace entitlement billing session, got error: %v", apiErr)
+	}
+	if err := session.Settle(300); err != nil {
+		t.Fatalf("expected initial settle success, got error: %v", err)
+	}
+
+	retryFunding := &MarketplaceEntitlementFunding{
+		requestId:        relayInfo.RequestId,
+		userId:           fixture.buyer.Id,
+		tokenId:          relayInfo.TokenId,
+		modelName:        fixture.supply.ModelName,
+		relayMode:        relayInfo.RelayMode,
+		relayInfo:        relayInfo,
+		preConsumed:      300,
+		entitlementId:    fixture.entitlement.Id,
+		entitlementLotId: fixture.lot.Id,
+		sellerId:         fixture.seller.Id,
+		supplyAccountId:  fixture.supply.Id,
+		listingId:        fixture.listing.Id,
+		orderId:          fixture.order.Id,
+		orderItemId:      fixture.lot.OrderItemId,
+		channelIDs:       []int{fixture.channel.Id},
+		promptTokens:     300,
+		completionTokens: 0,
+		totalTokens:      300,
+	}
+	if err := retryFunding.Settle(0); err != nil {
+		t.Fatalf("expected retry settle to stay idempotent, got error: %v", err)
+	}
+
+	lot, err := getEntitlementLotByID(fixture.lot.Id)
+	if err != nil {
+		t.Fatalf("failed to reload entitlement lot after retry settle: %v", err)
+	}
+	if lot.UsedAmount != 300 {
+		t.Fatalf("expected entitlement lot used amount to remain 300 after retry settle, got %+v", lot)
+	}
+
+	orderItem, err := getMarketOrderItemByID(fixture.lot.OrderItemId)
+	if err != nil {
+		t.Fatalf("failed to reload market order item after retry settle: %v", err)
+	}
+	if orderItem.UsedAmount != 300 {
+		t.Fatalf("expected market order item used amount to remain 300 after retry settle, got %+v", orderItem)
 	}
 }
 
@@ -449,4 +553,12 @@ func getEntitlementLotByID(id int) (*model.EntitlementLot, error) {
 		return nil, err
 	}
 	return &lot, nil
+}
+
+func getMarketOrderItemByID(id int) (*model.MarketOrderItem, error) {
+	var item model.MarketOrderItem
+	if err := model.DB.First(&item, id).Error; err != nil {
+		return nil, err
+	}
+	return &item, nil
 }

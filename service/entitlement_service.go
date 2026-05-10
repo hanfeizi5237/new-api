@@ -3,11 +3,16 @@ package service
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"gorm.io/gorm"
 )
+
+var createBuyerEntitlementTxFunc = func(tx *gorm.DB, entitlement *model.BuyerEntitlement) error {
+	return tx.Create(entitlement).Error
+}
 
 func ListBuyerEntitlements(buyerUserId int, modelName string, offset int, limit int) ([]*model.BuyerEntitlement, int64, error) {
 	if buyerUserId <= 0 {
@@ -45,21 +50,8 @@ func grantEntitlementsForOrderTx(tx *gorm.DB, order *model.MarketOrder, items []
 			return err
 		}
 
-		var entitlement model.BuyerEntitlement
-		err := lockForUpdate(tx).
-			Where("buyer_user_id = ? AND vendor_id = ? AND model_name = ?", order.BuyerUserId, item.VendorId, item.ModelName).
-			First(&entitlement).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			entitlement = model.BuyerEntitlement{
-				BuyerUserId: order.BuyerUserId,
-				VendorId:    item.VendorId,
-				ModelName:   item.ModelName,
-				Status:      "active",
-			}
-			if err := tx.Create(&entitlement).Error; err != nil {
-				return err
-			}
-		} else if err != nil {
+		entitlement, err := findOrCreateBuyerEntitlementTx(tx, order.BuyerUserId, item.VendorId, item.ModelName)
+		if err != nil {
 			return err
 		}
 
@@ -103,4 +95,51 @@ func grantEntitlementsForOrderTx(tx *gorm.DB, order *model.MarketOrder, items []
 		}
 	}
 	return nil
+}
+
+func findOrCreateBuyerEntitlementTx(tx *gorm.DB, buyerUserId int, vendorId int, modelName string) (*model.BuyerEntitlement, error) {
+	var entitlement model.BuyerEntitlement
+	err := lockForUpdate(tx).
+		Where("buyer_user_id = ? AND vendor_id = ? AND model_name = ?", buyerUserId, vendorId, modelName).
+		First(&entitlement).Error
+	if err == nil {
+		return &entitlement, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	entitlement = model.BuyerEntitlement{
+		BuyerUserId: buyerUserId,
+		VendorId:    vendorId,
+		ModelName:   modelName,
+		Status:      "active",
+	}
+	if err := createBuyerEntitlementTxFunc(tx, &entitlement); err != nil {
+		if !isUniqueConstraintError(err) {
+			return nil, err
+		}
+		var existing model.BuyerEntitlement
+		if rereadErr := lockForUpdate(tx).
+			Where("buyer_user_id = ? AND vendor_id = ? AND model_name = ?", buyerUserId, vendorId, modelName).
+			First(&existing).Error; rereadErr != nil {
+			return nil, rereadErr
+		}
+		return &existing, nil
+	}
+	return &entitlement, nil
+}
+
+func isUniqueConstraintError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "duplicate key") ||
+		strings.Contains(message, "duplicated key") ||
+		strings.Contains(message, "unique constraint") ||
+		strings.Contains(message, "unique failed")
 }

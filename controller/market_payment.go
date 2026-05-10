@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/Calcium-Ion/go-epay/epay"
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/gin-gonic/gin"
@@ -17,6 +19,21 @@ import (
 	"github.com/stripe/stripe-go/v81/webhook"
 	"github.com/waffo-com/waffo-go/core"
 )
+
+const marketplaceWebhookBodyLimitBytes int64 = 1 << 20
+
+func readMarketplaceWebhookBody(c *gin.Context) ([]byte, error) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, marketplaceWebhookBodyLimitBytes)
+	payload, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		if common.IsRequestBodyTooLargeError(err) {
+			c.AbortWithStatus(http.StatusRequestEntityTooLarge)
+			return nil, common.ErrRequestBodyTooLarge
+		}
+		return nil, err
+	}
+	return payload, nil
+}
 
 func MarketEpayNotify(c *gin.Context) {
 	var params map[string]string
@@ -86,8 +103,11 @@ func MarketEpayNotify(c *gin.Context) {
 }
 
 func MarketStripeWebhook(c *gin.Context) {
-	payload, err := io.ReadAll(c.Request.Body)
+	payload, err := readMarketplaceWebhookBody(c)
 	if err != nil {
+		if errors.Is(err, common.ErrRequestBodyTooLarge) {
+			return
+		}
 		c.AbortWithStatus(http.StatusServiceUnavailable)
 		return
 	}
@@ -111,7 +131,7 @@ func MarketStripeWebhook(c *gin.Context) {
 		defer UnlockOrder(orderNo)
 		if _, err := service.FailMarketOrderPayment(service.FailMarketOrderPaymentInput{
 			OrderNo:         orderNo,
-			PaymentMethod:   PaymentMethodStripe,
+			PaymentMethod:   model.PaymentMethodStripe,
 			FailureReason:   "stripe_session_expired",
 			ProviderPayload: string(payload),
 		}); err != nil {
@@ -140,7 +160,7 @@ func MarketStripeWebhook(c *gin.Context) {
 	defer UnlockOrder(orderNo)
 	if _, err := service.CompleteMarketOrderPayment(service.CompleteMarketOrderPaymentInput{
 		OrderNo:            orderNo,
-		PaymentMethod:      PaymentMethodStripe,
+		PaymentMethod:      model.PaymentMethodStripe,
 		PaymentTradeNo:     event.GetObjectValue("payment_intent"),
 		Currency:           strings.ToUpper(event.GetObjectValue("currency")),
 		PayableAmountMinor: amountMinor,
@@ -154,8 +174,11 @@ func MarketStripeWebhook(c *gin.Context) {
 }
 
 func MarketCreemWebhook(c *gin.Context) {
-	bodyBytes, err := io.ReadAll(c.Request.Body)
+	bodyBytes, err := readMarketplaceWebhookBody(c)
 	if err != nil {
+		if errors.Is(err, common.ErrRequestBodyTooLarge) {
+			return
+		}
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
@@ -213,8 +236,11 @@ func MarketCreemWebhook(c *gin.Context) {
 }
 
 func MarketWaffoWebhook(c *gin.Context) {
-	bodyBytes, err := io.ReadAll(c.Request.Body)
+	bodyBytes, err := readMarketplaceWebhookBody(c)
 	if err != nil {
+		if errors.Is(err, common.ErrRequestBodyTooLarge) {
+			return
+		}
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}

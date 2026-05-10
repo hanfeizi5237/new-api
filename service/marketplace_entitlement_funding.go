@@ -34,6 +34,9 @@ type MarketplaceEntitlementFunding struct {
 	orderId          int
 	orderItemId      int
 	channelIDs       []int
+	promptTokens     int
+	completionTokens int
+	totalTokens      int
 }
 
 func (m *MarketplaceEntitlementFunding) Source() string { return BillingSourceMarketplaceEntitlement }
@@ -120,6 +123,14 @@ func (m *MarketplaceEntitlementFunding) Settle(delta int) error {
 		return fmt.Errorf("invalid marketplace entitlement settle delta: %d", delta)
 	}
 	return model.DB.Transaction(func(tx *gorm.DB) error {
+		successEventKey := m.requestId + ":success"
+		var existingLedger model.UsageLedger
+		if err := tx.Where("event_key = ?", successEventKey).First(&existingLedger).Error; err == nil {
+			return nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
 		var lot model.EntitlementLot
 		if err := lockForUpdate(tx).First(&lot, m.entitlementLotId).Error; err != nil {
 			return err
@@ -164,6 +175,16 @@ func (m *MarketplaceEntitlementFunding) Settle(delta int) error {
 		snapshot.AvailableAmount = recomputeInventoryAvailableAmount(&supply, snapshot)
 		snapshot.LastSyncAt = common.GetTimestamp()
 
+		var orderItem *model.MarketOrderItem
+		if actualQuota > 0 && m.orderItemId > 0 {
+			loadedOrderItem := &model.MarketOrderItem{}
+			if err := lockForUpdate(tx).First(loadedOrderItem, m.orderItemId).Error; err != nil {
+				return err
+			}
+			loadedOrderItem.UsedAmount += int64(actualQuota)
+			orderItem = loadedOrderItem
+		}
+
 		if err := tx.Save(&lot).Error; err != nil {
 			return err
 		}
@@ -176,9 +197,14 @@ func (m *MarketplaceEntitlementFunding) Settle(delta int) error {
 		if err := tx.Save(snapshot).Error; err != nil {
 			return err
 		}
+		if orderItem != nil {
+			if err := tx.Save(orderItem).Error; err != nil {
+				return err
+			}
+		}
 		// Success and refund flows both upsert by event key so webhook retries do not duplicate usage ledgers.
 		return upsertMarketplaceUsageLedgerTx(tx, marketplaceUsageLedgerInput{
-			EventKey:         m.requestId + ":success",
+			EventKey:         successEventKey,
 			RequestID:        m.requestId,
 			LedgerStatus:     "success",
 			BillingSource:    BillingSourceMarketplaceEntitlement,
@@ -193,6 +219,9 @@ func (m *MarketplaceEntitlementFunding) Settle(delta int) error {
 			EntitlementLotID: m.entitlementLotId,
 			ModelName:        m.modelName,
 			EndpointType:     marketplaceEndpointType(m.relayMode),
+			PromptTokens:     m.promptTokens,
+			CompletionTokens: m.completionTokens,
+			TotalTokens:      m.totalTokens,
 			PreConsumedQuota: m.preConsumed,
 			ActualQuota:      actualQuota,
 			RetryIndex:       marketplaceRelayRetryIndex(m.relayInfo),
@@ -276,6 +305,9 @@ type marketplaceUsageLedgerInput struct {
 	EntitlementLotID int
 	ModelName        string
 	EndpointType     string
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
 	PreConsumedQuota int
 	ActualQuota      int
 	RetryIndex       int
@@ -305,6 +337,9 @@ func upsertMarketplaceUsageLedgerTx(tx *gorm.DB, input marketplaceUsageLedgerInp
 				"entitlement_lot_id": input.EntitlementLotID,
 				"model_name":         input.ModelName,
 				"endpoint_type":      input.EndpointType,
+				"prompt_tokens":      input.PromptTokens,
+				"completion_tokens":  input.CompletionTokens,
+				"total_tokens":       input.TotalTokens,
 				"pre_consumed_quota": input.PreConsumedQuota,
 				"actual_quota":       input.ActualQuota,
 				"retry_index":        input.RetryIndex,
@@ -334,6 +369,9 @@ func upsertMarketplaceUsageLedgerTx(tx *gorm.DB, input marketplaceUsageLedgerInp
 		EntitlementLotId: input.EntitlementLotID,
 		ModelName:        input.ModelName,
 		EndpointType:     input.EndpointType,
+		PromptTokens:     input.PromptTokens,
+		CompletionTokens: input.CompletionTokens,
+		TotalTokens:      input.TotalTokens,
 		PreConsumedQuota: input.PreConsumedQuota,
 		ActualQuota:      input.ActualQuota,
 		RetryIndex:       input.RetryIndex,
@@ -344,6 +382,12 @@ func upsertMarketplaceUsageLedgerTx(tx *gorm.DB, input marketplaceUsageLedgerInp
 		ErrorCode:        input.LedgerErrorCode,
 	}
 	return tx.Create(&ledger).Error
+}
+
+func (m *MarketplaceEntitlementFunding) captureUsageSummary(summary textQuotaSummary) {
+	m.promptTokens = summary.PromptTokens
+	m.completionTokens = summary.CompletionTokens
+	m.totalTokens = summary.TotalTokens
 }
 
 func resolveMarketplaceEntitlementBillingSession(relayInfo *relaycommon.RelayInfo, preConsumedQuota int) (*BillingSession, *types.NewAPIError, bool) {

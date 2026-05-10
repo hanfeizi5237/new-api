@@ -7,10 +7,13 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -445,5 +448,89 @@ func TestVerifySellerSecretUsesProviderProbeBeforeActivation(t *testing.T) {
 	}
 	if updatedSecret.Status == "active" || updatedSecret.VerifyStatus == "success" {
 		t.Fatalf("expected provider probe failure to block activation, got %+v", updatedSecret)
+	}
+}
+
+func TestVerifySellerSecretDefaultLiveProbeActivatesOpenAICompatibleSecret(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+	user := seedMarketplaceServiceUser(t, db, "svc-secret-default-probe-success")
+	seller, supply := seedMarketplaceServiceSupply(t, db, user, "paused", "pending", "token")
+	channel, _ := seedMarketplaceChannelBinding(t, db, supply, "old-runtime-key")
+	t.Setenv("SELLER_SECRET_MASTER_KEY", strings.Repeat("q", 32))
+
+	probeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			t.Fatalf("expected probe path /v1/models, got %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer sk-probe-live" {
+			t.Fatalf("expected bearer probe auth, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"gpt-4o-mini"}]}`))
+	}))
+	defer probeServer.Close()
+
+	channel.Type = constant.ChannelTypeOpenAI
+	channel.BaseURL = &probeServer.URL
+	if err := db.Save(channel).Error; err != nil {
+		t.Fatalf("failed to update channel for probe test: %v", err)
+	}
+
+	previousProbe := sellerSecretLiveProbeFunc
+	SetSellerSecretLiveProbeFunc(nil)
+	t.Cleanup(func() {
+		sellerSecretLiveProbeFunc = previousProbe
+	})
+
+	secretPayload := makeSellerSecretCiphertext(t, strings.Repeat("q", 32), "sk-probe-live", "v1")
+	secret := seedSellerSecretRecord(t, db, seller.Id, supply.Id, secretPayload, "fp-probe-success", "draft", "pending")
+
+	verified, err := VerifySellerSecret(secret.Id, user.Id)
+	if err != nil {
+		t.Fatalf("expected verify secret success with default live probe, got error: %v", err)
+	}
+	if verified.Status != "active" || verified.VerifyStatus != "success" {
+		t.Fatalf("expected verified secret active/success after default probe, got %+v", verified)
+	}
+}
+
+func TestVerifySellerSecretDefaultLiveProbeBlocksActivationOnUnauthorized(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+	user := seedMarketplaceServiceUser(t, db, "svc-secret-default-probe-fail")
+	seller, supply := seedMarketplaceServiceSupply(t, db, user, "paused", "pending", "token")
+	channel, _ := seedMarketplaceChannelBinding(t, db, supply, "old-runtime-key")
+	t.Setenv("SELLER_SECRET_MASTER_KEY", strings.Repeat("u", 32))
+
+	probeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("unauthorized"))
+	}))
+	defer probeServer.Close()
+
+	channel.Type = constant.ChannelTypeOpenAI
+	channel.BaseURL = &probeServer.URL
+	if err := db.Save(channel).Error; err != nil {
+		t.Fatalf("failed to update channel for probe test: %v", err)
+	}
+
+	previousProbe := sellerSecretLiveProbeFunc
+	SetSellerSecretLiveProbeFunc(nil)
+	t.Cleanup(func() {
+		sellerSecretLiveProbeFunc = previousProbe
+	})
+
+	secretPayload := makeSellerSecretCiphertext(t, strings.Repeat("u", 32), "sk-probe-blocked", "v1")
+	secret := seedSellerSecretRecord(t, db, seller.Id, supply.Id, secretPayload, "fp-probe-fail", "draft", "pending")
+
+	if _, err := VerifySellerSecret(secret.Id, user.Id); err == nil {
+		t.Fatalf("expected verify secret to fail when default live probe is unauthorized")
+	}
+
+	updatedSecret, err := model.GetSellerSecretByID(secret.Id)
+	if err != nil {
+		t.Fatalf("failed to reload secret after unauthorized probe: %v", err)
+	}
+	if updatedSecret.Status == "active" || updatedSecret.VerifyStatus == "success" {
+		t.Fatalf("expected unauthorized probe to block activation, got %+v", updatedSecret)
 	}
 }

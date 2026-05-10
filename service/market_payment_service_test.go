@@ -1,11 +1,13 @@
 package service
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"gorm.io/gorm"
 )
 
 func TestPrepareMarketOrderPaymentCreatesProviderIntentAndPersistsReference(t *testing.T) {
@@ -364,5 +366,68 @@ func TestMarketPaymentRetryAfterEntitlementFailureDoesNotDoubleCountInventory(t 
 	}
 	if lotCount != 1 {
 		t.Fatalf("retry should create exactly one entitlement lot, got %d", lotCount)
+	}
+}
+
+func TestMarketPaymentPersistsPaidFailureStateWhenEntitlementGrantFails(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+	buyer := seedMarketplaceServiceUser(t, db, "market-buyer-grant-fail")
+	sellerUser := seedMarketplaceServiceUser(t, db, "market-seller-grant-fail")
+	seller, supply := seedMarketplaceServiceSupply(t, db, sellerUser, "active", "success", "token")
+	_, _ = seedMarketplaceChannelBinding(t, db, supply, "runtime-key")
+	_ = seedSellerSecretRecord(t, db, seller.Id, supply.Id, `{"alg":"aes-256-gcm","kid":"v1","nonce":"bm9uY2U=","ciphertext":"Y2lwaGVy"}`, "fp-grant-fail", "active", "success")
+	listing, sku := seedMarketplaceListing(t, db, seller, supply, 2100, 499)
+
+	order, _, err := CreateMarketOrder(CreateMarketOrderInput{
+		BuyerUserID:    buyer.Id,
+		ListingID:      listing.Id,
+		SkuID:          sku.Id,
+		Quantity:       1,
+		IdempotencyKey: "order-pay-grant-fail-001",
+	})
+	if err != nil {
+		t.Fatalf("create market order returned error: %v", err)
+	}
+
+	previousGrantFunc := grantEntitlementsForOrderTxFunc
+	grantEntitlementsForOrderTxFunc = func(tx *gorm.DB, order *model.MarketOrder, items []model.MarketOrderItem) error {
+		return errors.New("synthetic entitlement grant failure")
+	}
+	t.Cleanup(func() {
+		grantEntitlementsForOrderTxFunc = previousGrantFunc
+	})
+
+	paidOrder, err := CompleteMarketOrderPayment(CompleteMarketOrderPaymentInput{
+		OrderNo:            order.OrderNo,
+		PaymentMethod:      "stripe",
+		PaymentTradeNo:     "pi_market_grant_fail_001",
+		Currency:           order.Currency,
+		PayableAmountMinor: order.PayableAmountMinor,
+		ProviderPayload:    `{"type":"checkout.session.completed"}`,
+	})
+	if err == nil {
+		t.Fatalf("expected entitlement grant failure to bubble up")
+	}
+	if paidOrder == nil {
+		t.Fatalf("expected paid order state to be returned with failure")
+	}
+	if paidOrder.OrderStatus != marketOrderStatusPaid || paidOrder.PaymentStatus != marketPaymentStatusPaid || paidOrder.EntitlementStatus != marketEntitlementStatusFailed {
+		t.Fatalf("expected paid + entitlement_failed state, got %+v", paidOrder)
+	}
+
+	reloadedOrder, err := model.GetMarketOrderByID(order.Id)
+	if err != nil {
+		t.Fatalf("failed to reload order: %v", err)
+	}
+	if reloadedOrder.OrderStatus != marketOrderStatusPaid || reloadedOrder.PaymentStatus != marketPaymentStatusPaid || reloadedOrder.EntitlementStatus != marketEntitlementStatusFailed {
+		t.Fatalf("expected persisted paid + entitlement_failed state, got %+v", reloadedOrder)
+	}
+
+	snapshot, err := model.GetInventorySnapshotBySupplyAccountID(supply.Id)
+	if err != nil {
+		t.Fatalf("failed to reload inventory snapshot: %v", err)
+	}
+	if snapshot.FrozenAmount != 0 || snapshot.SoldAmount != 2100 || snapshot.AvailableAmount != supply.SellableCapacity-2100 {
+		t.Fatalf("expected inventory payment-side mutations to persist, got %+v", snapshot)
 	}
 }
