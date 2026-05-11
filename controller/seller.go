@@ -69,7 +69,12 @@ func UpdateSellerAdminStatus(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if err := service.UpdateSellerStatus(id, req.Status, req.Remark); err != nil {
+	if err := service.UpdateSellerStatus(id, req.Status, req.Remark, service.MarketplaceAuditActor{
+		ActorUserID: c.GetInt("id"),
+		ActorType:   "admin",
+		RequestID:   c.GetString(common.RequestIdKey),
+		IP:          c.ClientIP(),
+	}); err != nil {
 		common.ApiError(c, err)
 		return
 	}

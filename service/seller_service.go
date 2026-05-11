@@ -9,6 +9,15 @@ import (
 	"gorm.io/gorm"
 )
 
+type MarketplaceAuditActor struct {
+	ActorUserID int
+	ActorType   string
+	RequestID   string
+	IP          string
+}
+
+var marketplaceOperationAuditWriter = model.CreateMarketplaceOperationAuditTx
+
 type CreateSellerInput struct {
 	Seller        model.SellerProfile
 	SupplyAccount model.SupplyAccount
@@ -130,12 +139,65 @@ func containsExactModel(models []string, target string) bool {
 	return false
 }
 
-func UpdateSellerStatus(id int, status string, remark string) error {
+func UpdateSellerStatus(id int, status string, remark string, actor MarketplaceAuditActor) error {
 	if id <= 0 {
 		return errors.New("invalid seller id")
 	}
-	if strings.TrimSpace(status) == "" {
+	nextStatus := strings.TrimSpace(status)
+	if nextStatus == "" {
 		return errors.New("status is required")
 	}
-	return model.UpdateSellerStatus(id, status, remark)
+	if actor.ActorUserID <= 0 {
+		return errors.New("actor_user_id is required")
+	}
+	return model.DB.Transaction(func(tx *gorm.DB) error {
+		var seller model.SellerProfile
+		if err := tx.First(&seller, id).Error; err != nil {
+			return err
+		}
+		beforeState := map[string]interface{}{
+			"status": seller.Status,
+			"remark": seller.Remark,
+		}
+		if err := model.UpdateSellerStatusTx(tx, seller.Id, nextStatus, remark); err != nil {
+			return err
+		}
+		return recordMarketplaceOperationAuditTx(tx, model.MarketplaceOperationAudit{
+			ActorUserId: actor.ActorUserID,
+			ActorType:   normalizeMarketplaceActorType(actor.ActorType),
+			Action:      "seller_status_update",
+			TargetType:  "seller",
+			TargetId:    seller.Id,
+			RequestId:   strings.TrimSpace(actor.RequestID),
+			Ip:          strings.TrimSpace(actor.IP),
+			Reason:      strings.TrimSpace(remark),
+			Result:      "success",
+			BeforeState: common.MapToJsonStr(beforeState),
+			AfterState: common.MapToJsonStr(map[string]interface{}{
+				"status": nextStatus,
+				"remark": remark,
+			}),
+			Meta: common.MapToJsonStr(map[string]interface{}{
+				"seller_user_id": seller.UserId,
+			}),
+		})
+	})
+}
+
+func recordMarketplaceOperationAuditTx(tx *gorm.DB, audit model.MarketplaceOperationAudit) error {
+	if tx == nil {
+		return errors.New("tx is required")
+	}
+	if audit.ActorUserId <= 0 {
+		return errors.New("actor_user_id is required")
+	}
+	return marketplaceOperationAuditWriter(tx, &audit)
+}
+
+func normalizeMarketplaceActorType(actorType string) string {
+	actorType = strings.TrimSpace(actorType)
+	if actorType == "" {
+		return "admin"
+	}
+	return actorType
 }

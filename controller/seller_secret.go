@@ -4,10 +4,13 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
@@ -47,6 +50,13 @@ type SellerSecretView struct {
 	CreatedAt       int64  `json:"created_at"`
 	UpdatedAt       int64  `json:"updated_at"`
 }
+
+var genericMarketplaceRiskReasons = map[string]struct{}{
+	"fix":  {},
+	"test": {},
+}
+
+const marketplaceSecureVerificationMethodSessionKey = "secure_verified_method"
 
 func toSellerSecretView(secret *model.SellerSecret) SellerSecretView {
 	return SellerSecretView{
@@ -126,7 +136,7 @@ func CreateSellerSecretAdmin(c *gin.Context) {
 		ProviderCode:    req.ProviderCode,
 		ExpiresAt:       req.ExpiresAt,
 		Meta:            req.Meta,
-	}, c.GetInt("id"), req.Reason)
+	}, buildSellerSecretAuditActor(c), req.Reason)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -144,7 +154,7 @@ func VerifySellerSecretAdmin(c *gin.Context) {
 		common.ApiError(c, errors.New("invalid seller secret id"))
 		return
 	}
-	secret, err := service.VerifySellerSecret(id, c.GetInt("id"))
+	secret, err := service.VerifySellerSecret(id, buildSellerSecretAuditActor(c))
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -167,7 +177,11 @@ func DisableSellerSecretAdmin(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	secret, err := service.DisableSellerSecret(id, c.GetInt("id"), req.Reason)
+	if err := requireMarketplaceRiskAction(c, req.Reason); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	secret, err := service.DisableSellerSecret(id, buildSellerSecretAuditActor(c), req.Reason)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -190,10 +204,62 @@ func RecoverSellerSecretAdmin(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	secret, err := service.RecoverSellerSecret(id, c.GetInt("id"), req.Reason)
+	if err := requireMarketplaceRiskAction(c, req.Reason); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	secret, err := service.RecoverSellerSecret(id, buildSellerSecretAuditActor(c), req.Reason)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
 	common.ApiSuccess(c, toSellerSecretView(secret))
+}
+
+func hasFreshSecureVerification(c *gin.Context) bool {
+	if _, ok := c.Get(sessions.DefaultKey); !ok {
+		return false
+	}
+	session := sessions.Default(c)
+	verifiedAtRaw := session.Get(middleware.SecureVerificationSessionKey)
+	verifiedAt, ok := verifiedAtRaw.(int64)
+	if !ok {
+		return false
+	}
+	return time.Now().Unix()-verifiedAt < middleware.SecureVerificationTimeout
+}
+
+func validateMarketplaceRiskReason(reason string) error {
+	trimmed := strings.TrimSpace(reason)
+	if trimmed == "" {
+		return errors.New("reason is required")
+	}
+	if _, ok := genericMarketplaceRiskReasons[strings.ToLower(trimmed)]; ok {
+		return errors.New("reason is too generic")
+	}
+	return nil
+}
+
+func buildSellerSecretAuditActor(c *gin.Context) service.SellerSecretAuditActor {
+	secureVerificationMethod := ""
+	if _, ok := c.Get(sessions.DefaultKey); ok {
+		session := sessions.Default(c)
+		secureVerificationMethod, _ = session.Get(marketplaceSecureVerificationMethodSessionKey).(string)
+	}
+	actorType := "admin"
+	if c.GetInt("role") >= common.RoleRootUser {
+		actorType = "root"
+	}
+	return service.SellerSecretAuditActor{
+		ActorUserID: c.GetInt("id"),
+		ActorType:   actorType,
+		RequestID:   c.GetString(common.RequestIdKey),
+		IP:          c.ClientIP(),
+		Meta: common.MapToJsonStr(map[string]any{
+			"request_path":               c.FullPath(),
+			"request_method":             c.Request.Method,
+			"actor_role":                 c.GetInt("role"),
+			"secure_verification_method": secureVerificationMethod,
+		}),
+	}
 }

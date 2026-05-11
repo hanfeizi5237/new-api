@@ -51,6 +51,7 @@ func setupMarketplaceServiceTestDB(t *testing.T) *gorm.DB {
 		&model.Channel{},
 		&model.Log{},
 		&model.SellerProfile{},
+		&model.MarketplaceOperationAudit{},
 		&model.SupplyAccount{},
 		&model.SellerSecret{},
 		&model.SellerSecretAudit{},
@@ -275,6 +276,23 @@ func seedSellerSecretRecord(t *testing.T, db *gorm.DB, sellerId int, supplyAccou
 	return secret
 }
 
+func makeSellerSecretAuditActor(userId int, actorType string, requestID string, ip string) SellerSecretAuditActor {
+	if actorType == "" {
+		actorType = "admin"
+	}
+	return SellerSecretAuditActor{
+		ActorUserID: userId,
+		ActorType:   actorType,
+		RequestID:   requestID,
+		IP:          ip,
+		Meta: common.MapToJsonStr(map[string]any{
+			"request_path":   "/api/marketplace/admin/seller-secrets",
+			"request_method": http.MethodPost,
+			"actor_role":     actorType,
+		}),
+	}
+}
+
 func TestVerifySellerSecretRejectsMalformedCiphertext(t *testing.T) {
 	db := setupMarketplaceServiceTestDB(t)
 	user := seedMarketplaceServiceUser(t, db, "svc-secret-malformed")
@@ -283,7 +301,7 @@ func TestVerifySellerSecretRejectsMalformedCiphertext(t *testing.T) {
 	secret := seedSellerSecretRecord(t, db, seller.Id, supply.Id, "not-json", "fp-malformed", "draft", "pending")
 	t.Setenv("SELLER_SECRET_MASTER_KEY", strings.Repeat("k", 32))
 
-	if _, err := VerifySellerSecret(secret.Id, user.Id); err == nil {
+	if _, err := VerifySellerSecret(secret.Id, makeSellerSecretAuditActor(user.Id, "admin", "req-secret-malformed", "198.51.100.51")); err == nil {
 		t.Fatalf("expected verify to fail for malformed ciphertext")
 	}
 
@@ -308,7 +326,7 @@ func TestVerifySellerSecretPromotesNewSecretAndRotatesOldSecret(t *testing.T) {
 	candidatePayload := makeSellerSecretCiphertext(t, strings.Repeat("s", 32), "sk-live-new", "v1")
 	candidate := seedSellerSecretRecord(t, db, seller.Id, supply.Id, candidatePayload, "fp-new", "draft", "pending")
 
-	verified, err := VerifySellerSecret(candidate.Id, user.Id)
+	verified, err := VerifySellerSecret(candidate.Id, makeSellerSecretAuditActor(user.Id, "admin", "req-secret-rotate", "198.51.100.52"))
 	if err != nil {
 		t.Fatalf("expected verify to promote candidate secret, got error: %v", err)
 	}
@@ -358,7 +376,10 @@ func TestDisableAndRecoverSecretRecomputeSupplyFromAllSecrets(t *testing.T) {
 	draftPayload := makeSellerSecretCiphertext(t, strings.Repeat("r", 32), "sk-draft", "v1")
 	draft := seedSellerSecretRecord(t, db, seller.Id, supply.Id, draftPayload, "fp-draft", "draft", "pending")
 
-	if _, err := DisableSellerSecret(draft.Id, user.Id, "disable candidate"); err != nil {
+	if _, err := DisableSellerSecret(draft.Id, SellerSecretAuditActor{
+		ActorUserID: user.Id,
+		ActorType:   "admin",
+	}, "disable candidate"); err != nil {
 		t.Fatalf("disable secret returned error: %v", err)
 	}
 	updatedSupply, err := model.GetSupplyAccountByID(supply.Id)
@@ -369,7 +390,10 @@ func TestDisableAndRecoverSecretRecomputeSupplyFromAllSecrets(t *testing.T) {
 		t.Fatalf("expected supply to stay active/success after disabling draft secret, got %+v", updatedSupply)
 	}
 
-	if _, err := RecoverSellerSecret(draft.Id, user.Id, "recover candidate"); err != nil {
+	if _, err := RecoverSellerSecret(draft.Id, SellerSecretAuditActor{
+		ActorUserID: user.Id,
+		ActorType:   "admin",
+	}, "recover candidate"); err != nil {
 		t.Fatalf("recover secret returned error: %v", err)
 	}
 	updatedSupply, err = model.GetSupplyAccountByID(supply.Id)
@@ -378,6 +402,66 @@ func TestDisableAndRecoverSecretRecomputeSupplyFromAllSecrets(t *testing.T) {
 	}
 	if updatedSupply.Status != "active" || updatedSupply.VerifyStatus != "success" {
 		t.Fatalf("expected supply to stay active/success after recovering non-primary secret, got %+v", updatedSupply)
+	}
+}
+
+func TestDisableAndRecoverSecretPersistAuditContext(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+	user := seedMarketplaceServiceUser(t, db, "svc-secret-audit-context")
+	seller, supply := seedMarketplaceServiceSupply(t, db, user, "active", "success", "token")
+	t.Setenv("SELLER_SECRET_MASTER_KEY", strings.Repeat("a", 32))
+
+	activePayload := makeSellerSecretCiphertext(t, strings.Repeat("a", 32), "sk-audit", "v1")
+	secret := seedSellerSecretRecord(t, db, seller.Id, supply.Id, activePayload, "fp-audit", "active", "success")
+
+	disableActor := SellerSecretAuditActor{
+		ActorUserID: user.Id,
+		ActorType:   "root",
+		RequestID:   "req-seller-secret-disable-audit",
+		IP:          "198.51.100.40",
+		Meta: common.MapToJsonStr(map[string]any{
+			"request_path":   "/api/marketplace/admin/seller-secrets/1/disable",
+			"request_method": http.MethodPost,
+		}),
+	}
+	if _, err := DisableSellerSecret(secret.Id, disableActor, "root audit disable"); err != nil {
+		t.Fatalf("disable secret returned error: %v", err)
+	}
+
+	var disableAudit model.SellerSecretAudit
+	if err := db.Where("seller_secret_id = ? AND action = ?", secret.Id, "disable").Order("id desc").First(&disableAudit).Error; err != nil {
+		t.Fatalf("failed to load disable audit: %v", err)
+	}
+	if disableAudit.ActorType != "root" || disableAudit.RequestId != disableActor.RequestID || disableAudit.Ip != disableActor.IP {
+		t.Fatalf("expected disable audit context to be persisted, got %+v", disableAudit)
+	}
+	if disableAudit.Meta == "" || !strings.Contains(disableAudit.Meta, "request_path") {
+		t.Fatalf("expected disable audit meta to contain request context, got %q", disableAudit.Meta)
+	}
+
+	recoverActor := SellerSecretAuditActor{
+		ActorUserID: user.Id,
+		ActorType:   "root",
+		RequestID:   "req-seller-secret-recover-audit",
+		IP:          "198.51.100.41",
+		Meta: common.MapToJsonStr(map[string]any{
+			"request_path":   "/api/marketplace/admin/seller-secrets/1/recover",
+			"request_method": http.MethodPost,
+		}),
+	}
+	if _, err := RecoverSellerSecret(secret.Id, recoverActor, "root audit recover"); err != nil {
+		t.Fatalf("recover secret returned error: %v", err)
+	}
+
+	var recoverAudit model.SellerSecretAudit
+	if err := db.Where("seller_secret_id = ? AND action = ?", secret.Id, "recover").Order("id desc").First(&recoverAudit).Error; err != nil {
+		t.Fatalf("failed to load recover audit: %v", err)
+	}
+	if recoverAudit.ActorType != "root" || recoverAudit.RequestId != recoverActor.RequestID || recoverAudit.Ip != recoverActor.IP {
+		t.Fatalf("expected recover audit context to be persisted, got %+v", recoverAudit)
+	}
+	if recoverAudit.Meta == "" || !strings.Contains(recoverAudit.Meta, "request_path") {
+		t.Fatalf("expected recover audit meta to contain request context, got %q", recoverAudit.Meta)
 	}
 }
 
@@ -391,7 +475,8 @@ func TestVerifySellerSecretSyncsRuntimeChannelMirror(t *testing.T) {
 	secretPayload := makeSellerSecretCiphertext(t, strings.Repeat("m", 32), "sk-runtime-live", "v1")
 	secret := seedSellerSecretRecord(t, db, seller.Id, supply.Id, secretPayload, "fp-sync", "draft", "pending")
 
-	verified, err := VerifySellerSecret(secret.Id, user.Id)
+	verifyActor := makeSellerSecretAuditActor(user.Id, "admin", "req-secret-sync", "198.51.100.53")
+	verified, err := VerifySellerSecret(secret.Id, verifyActor)
 	if err != nil {
 		t.Fatalf("verify secret returned error: %v", err)
 	}
@@ -409,6 +494,25 @@ func TestVerifySellerSecretSyncsRuntimeChannelMirror(t *testing.T) {
 	otherInfo := reloadedChannel.GetOtherInfo()
 	if otherInfo["managed_by"] != "seller_secret" {
 		t.Fatalf("expected channel managed_by seller_secret, got %+v", otherInfo)
+	}
+
+	var verifyAudit model.SellerSecretAudit
+	if err := db.Where("seller_secret_id = ? AND action = ?", secret.Id, "verify_success").Order("id desc").First(&verifyAudit).Error; err != nil {
+		t.Fatalf("failed to load verify_success audit: %v", err)
+	}
+	if verifyAudit.RequestId != verifyActor.RequestID || verifyAudit.Ip != verifyActor.IP || verifyAudit.ActorType != verifyActor.ActorType {
+		t.Fatalf("expected verify_success audit context, got %+v", verifyAudit)
+	}
+	if !strings.Contains(verifyAudit.Meta, "runtime_channels") || !strings.Contains(verifyAudit.Meta, "request_path") {
+		t.Fatalf("expected verify_success audit meta to merge runtime channels and request context, got %q", verifyAudit.Meta)
+	}
+
+	var syncAudit model.SellerSecretAudit
+	if err := db.Where("seller_secret_id = ? AND action = ?", secret.Id, "sync_channel").Order("id desc").First(&syncAudit).Error; err != nil {
+		t.Fatalf("failed to load sync_channel audit: %v", err)
+	}
+	if syncAudit.RequestId != verifyActor.RequestID || syncAudit.Ip != verifyActor.IP || syncAudit.ActorType != verifyActor.ActorType {
+		t.Fatalf("expected sync_channel audit context, got %+v", syncAudit)
 	}
 }
 
@@ -435,7 +539,8 @@ func TestVerifySellerSecretUsesProviderProbeBeforeActivation(t *testing.T) {
 		sellerSecretLiveProbeFunc = previousProbe
 	})
 
-	if _, err := VerifySellerSecret(secret.Id, user.Id); err == nil {
+	verifyActor := makeSellerSecretAuditActor(user.Id, "admin", "req-secret-probe-fail", "198.51.100.54")
+	if _, err := VerifySellerSecret(secret.Id, verifyActor); err == nil {
 		t.Fatalf("expected verify to fail when provider probe fails")
 	}
 	if probeCalls != 1 {
@@ -448,6 +553,17 @@ func TestVerifySellerSecretUsesProviderProbeBeforeActivation(t *testing.T) {
 	}
 	if updatedSecret.Status == "active" || updatedSecret.VerifyStatus == "success" {
 		t.Fatalf("expected provider probe failure to block activation, got %+v", updatedSecret)
+	}
+
+	var failedAudit model.SellerSecretAudit
+	if err := db.Where("seller_secret_id = ? AND action = ?", secret.Id, "verify_failed").Order("id desc").First(&failedAudit).Error; err != nil {
+		t.Fatalf("failed to load verify_failed audit: %v", err)
+	}
+	if failedAudit.RequestId != verifyActor.RequestID || failedAudit.Ip != verifyActor.IP || failedAudit.ActorType != verifyActor.ActorType {
+		t.Fatalf("expected verify_failed audit context, got %+v", failedAudit)
+	}
+	if !strings.Contains(failedAudit.Meta, "verify_message") || !strings.Contains(failedAudit.Meta, "request_path") {
+		t.Fatalf("expected verify_failed audit meta to merge error and request context, got %q", failedAudit.Meta)
 	}
 }
 
@@ -485,7 +601,7 @@ func TestVerifySellerSecretDefaultLiveProbeActivatesOpenAICompatibleSecret(t *te
 	secretPayload := makeSellerSecretCiphertext(t, strings.Repeat("q", 32), "sk-probe-live", "v1")
 	secret := seedSellerSecretRecord(t, db, seller.Id, supply.Id, secretPayload, "fp-probe-success", "draft", "pending")
 
-	verified, err := VerifySellerSecret(secret.Id, user.Id)
+	verified, err := VerifySellerSecret(secret.Id, makeSellerSecretAuditActor(user.Id, "admin", "req-secret-default-probe-success", "198.51.100.55"))
 	if err != nil {
 		t.Fatalf("expected verify secret success with default live probe, got error: %v", err)
 	}
@@ -522,7 +638,7 @@ func TestVerifySellerSecretDefaultLiveProbeBlocksActivationOnUnauthorized(t *tes
 	secretPayload := makeSellerSecretCiphertext(t, strings.Repeat("u", 32), "sk-probe-blocked", "v1")
 	secret := seedSellerSecretRecord(t, db, seller.Id, supply.Id, secretPayload, "fp-probe-fail", "draft", "pending")
 
-	if _, err := VerifySellerSecret(secret.Id, user.Id); err == nil {
+	if _, err := VerifySellerSecret(secret.Id, makeSellerSecretAuditActor(user.Id, "admin", "req-secret-default-probe-fail", "198.51.100.56")); err == nil {
 		t.Fatalf("expected verify secret to fail when default live probe is unauthorized")
 	}
 

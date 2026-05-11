@@ -15,9 +15,9 @@ type CreateListingInput struct {
 }
 
 type MarketListingDetail struct {
-	Listing   *model.Listing            `json:"listing"`
-	SKUs      []model.ListingSKU        `json:"skus"`
-	Inventory *model.InventorySnapshot  `json:"inventory,omitempty"`
+	Listing   *model.Listing           `json:"listing"`
+	SKUs      []model.ListingSKU       `json:"skus"`
+	Inventory *model.InventorySnapshot `json:"inventory,omitempty"`
 }
 
 func ListListings(keyword string, status string, auditStatus string, sellerId int, offset int, limit int) ([]*model.Listing, int64, error) {
@@ -202,26 +202,63 @@ func CreateListingWithSKUs(input CreateListingInput) (*model.Listing, []model.Li
 	return &listing, skus, nil
 }
 
-func UpdateListingStatus(id int, status string, auditStatus string, auditRemark string) error {
+func UpdateListingStatus(id int, status string, auditStatus string, auditRemark string, actor MarketplaceAuditActor) error {
 	if id <= 0 {
 		return errors.New("invalid listing id")
 	}
 	if strings.TrimSpace(status) == "" && strings.TrimSpace(auditStatus) == "" && strings.TrimSpace(auditRemark) == "" {
 		return errors.New("at least one of status, audit_status or audit_remark is required")
 	}
-	listing, err := model.GetListingByID(id)
-	if err != nil {
-		return err
+	if actor.ActorUserID <= 0 {
+		return errors.New("actor_user_id is required")
 	}
-	nextAuditStatus, err := resolveNextListingAuditStatus(listing.AuditStatus, auditStatus)
-	if err != nil {
-		return err
-	}
-	nextStatus, err := resolveNextListingStatus(listing.Status, nextAuditStatus, status)
-	if err != nil {
-		return err
-	}
-	return model.UpdateListingStatus(id, nextStatus, nextAuditStatus, auditRemark)
+	return model.DB.Transaction(func(tx *gorm.DB) error {
+		var listing model.Listing
+		if err := tx.First(&listing, id).Error; err != nil {
+			return err
+		}
+		nextAuditStatus, err := resolveNextListingAuditStatus(listing.AuditStatus, auditStatus)
+		if err != nil {
+			return err
+		}
+		nextStatus, err := resolveNextListingStatus(listing.Status, nextAuditStatus, status)
+		if err != nil {
+			return err
+		}
+		afterAuditRemark := listing.AuditRemark
+		if strings.TrimSpace(auditRemark) != "" {
+			afterAuditRemark = auditRemark
+		}
+		beforeState := map[string]interface{}{
+			"status":       listing.Status,
+			"audit_status": listing.AuditStatus,
+			"audit_remark": listing.AuditRemark,
+		}
+		if err := model.UpdateListingStatusTx(tx, listing.Id, nextStatus, nextAuditStatus, auditRemark); err != nil {
+			return err
+		}
+		return recordMarketplaceOperationAuditTx(tx, model.MarketplaceOperationAudit{
+			ActorUserId: actor.ActorUserID,
+			ActorType:   normalizeMarketplaceActorType(actor.ActorType),
+			Action:      "listing_status_update",
+			TargetType:  "listing",
+			TargetId:    listing.Id,
+			RequestId:   strings.TrimSpace(actor.RequestID),
+			Ip:          strings.TrimSpace(actor.IP),
+			Reason:      strings.TrimSpace(auditRemark),
+			Result:      "success",
+			BeforeState: common.MapToJsonStr(beforeState),
+			AfterState: common.MapToJsonStr(map[string]interface{}{
+				"status":       nextStatus,
+				"audit_status": nextAuditStatus,
+				"audit_remark": afterAuditRemark,
+			}),
+			Meta: common.MapToJsonStr(map[string]interface{}{
+				"seller_id":         listing.SellerId,
+				"supply_account_id": listing.SupplyAccountId,
+			}),
+		})
+	})
 }
 
 func resolveNextListingAuditStatus(current string, requested string) (string, error) {

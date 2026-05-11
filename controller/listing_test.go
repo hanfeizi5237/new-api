@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 )
@@ -122,6 +123,44 @@ func TestListingAdminCreateListAndUpdateStatus(t *testing.T) {
 	if updated.Listing.Status != "active" || updated.Listing.AuditStatus != "approved" {
 		t.Fatalf("expected active approved listing, got %+v", updated.Listing)
 	}
+
+	var audits []model.MarketplaceOperationAudit
+	if err := db.Order("id asc").Find(&audits).Error; err != nil {
+		t.Fatalf("failed to load listing audits: %v", err)
+	}
+	if len(audits) != 2 {
+		t.Fatalf("expected exactly two listing audits, got %d", len(audits))
+	}
+	if audits[1].Action != "listing_status_update" || audits[1].TargetType != "listing" {
+		t.Fatalf("expected listing audit action/target, got %+v", audits[1])
+	}
+	if audits[1].ActorUserId != user.Id || audits[1].ActorType != "admin" {
+		t.Fatalf("expected listing audit actor info, got %+v", audits[1])
+	}
+	if audits[1].Reason != "ready" || audits[1].Result != "success" {
+		t.Fatalf("expected listing audit reason/result, got %+v", audits[1])
+	}
+	beforeState := map[string]interface{}{}
+	if err := common.UnmarshalJsonStr(audits[1].BeforeState, &beforeState); err != nil {
+		t.Fatalf("failed to decode listing before_state: %v", err)
+	}
+	afterState := map[string]interface{}{}
+	if err := common.UnmarshalJsonStr(audits[1].AfterState, &afterState); err != nil {
+		t.Fatalf("failed to decode listing after_state: %v", err)
+	}
+	if beforeState["status"] != "paused" || beforeState["audit_status"] != "pending_review" {
+		t.Fatalf("expected listing before_state paused/pending_review, got %+v", beforeState)
+	}
+	if afterState["status"] != "active" || afterState["audit_status"] != "approved" {
+		t.Fatalf("expected listing after_state active/approved, got %+v", afterState)
+	}
+	meta := map[string]interface{}{}
+	if err := common.UnmarshalJsonStr(audits[1].Meta, &meta); err != nil {
+		t.Fatalf("failed to decode listing audit meta: %v", err)
+	}
+	if meta["seller_id"] != float64(seller.Id) || meta["supply_account_id"] != float64(supply.Id) {
+		t.Fatalf("expected listing audit meta seller/supply ids, got %+v", meta)
+	}
 }
 
 func TestListingAdminRejectsInvalidStatusTransitions(t *testing.T) {
@@ -195,6 +234,144 @@ func TestListingAdminRejectsInvalidStatusTransitions(t *testing.T) {
 	invalidStatusResp := decodeMarketplaceResponse(t, invalidStatusRecorder)
 	if invalidStatusResp.Success {
 		t.Fatalf("expected invalid listing status to fail")
+	}
+}
+
+func TestListingAdminRecoveryRequiresRiskScopeAndSecureVerification(t *testing.T) {
+	db := setupMarketplaceControllerTestDB(t)
+	user := seedMarketplaceUser(t, db, "listing-admin-recovery")
+	seller, supply := seedMarketplaceSellerWithSupply(t, db, user.Id)
+	supply.VerifyStatus = "success"
+	if err := db.Save(supply).Error; err != nil {
+		t.Fatalf("failed to update supply verify status: %v", err)
+	}
+	_, _ = seedMarketplaceChannelBinding(t, db, supply, "listing-recovery-runtime-key")
+	if err := db.Create(&model.SellerSecret{
+		SellerId:        seller.Id,
+		SupplyAccountId: supply.Id,
+		SecretType:      "api_key",
+		ProviderCode:    "openai",
+		Ciphertext:      `{"alg":"aes-256-gcm","kid":"v1","nonce":"bm9uY2U=","ciphertext":"Y2lwaGVy"}`,
+		CipherVersion:   "v1",
+		Fingerprint:     "fp-listing-recovery",
+		MaskedValue:     "sk-***listing-recovery",
+		Status:          "active",
+		VerifyStatus:    "success",
+		VerifyMessage:   "seeded active secret",
+	}).Error; err != nil {
+		t.Fatalf("failed to seed active secret: %v", err)
+	}
+
+	createBody := CreateListingAdminRequest{
+		Listing: model.Listing{
+			SellerId:        seller.Id,
+			SupplyAccountId: supply.Id,
+			ListingCode:     "listing-admin-recovery-001",
+			Title:           "GPT Recovery Package",
+			SaleMode:        "fixed_price",
+			PricingUnit:     "per_token_package",
+		},
+		SKUs: []model.ListingSKU{
+			{
+				SkuCode:        "sku-admin-recovery-001",
+				PackageAmount:  1000,
+				PackageUnit:    "token",
+				UnitPriceMinor: 199,
+				MinQuantity:    1,
+				MaxQuantity:    5,
+			},
+		},
+	}
+	createCtx, createRecorder := newMarketplaceContext(t, http.MethodPost, "/api/listing/admin", createBody, user.Id)
+	CreateListingAdmin(createCtx)
+	createResp := decodeMarketplaceResponse(t, createRecorder)
+	if !createResp.Success {
+		t.Fatalf("expected create listing success, got message: %s", createResp.Message)
+	}
+
+	var created ListingAdminView
+	if err := common.Unmarshal(createResp.Data, &created); err != nil {
+		t.Fatalf("failed to decode created listing: %v", err)
+	}
+	if err := db.Model(&model.Listing{}).Where("id = ?", created.Listing.Id).Updates(map[string]any{
+		"status":       "paused",
+		"audit_status": "approved",
+		"audit_remark": "auto paused",
+	}).Error; err != nil {
+		t.Fatalf("failed to seed paused approved listing state: %v", err)
+	}
+
+	recoveryBody := UpdateListingStatusRequest{
+		Status:      "active",
+		AuditRemark: "manual recovery after inventory sync",
+	}
+
+	adminRecorder := performMarketplaceScopedRequestWithSession(
+		t,
+		http.MethodPut,
+		"/api/listing/admin/"+strconv.Itoa(created.Listing.Id)+"/status",
+		recoveryBody,
+		user.Id,
+		common.RoleAdminUser,
+		"default",
+		true,
+		"req-listing-recovery-admin-denied",
+		"198.51.100.31",
+		func(engine *gin.Engine) {
+			engine.PUT("/api/listing/admin/:id/status", middleware.AdminAuth(), UpdateListingAdminStatus)
+		},
+	)
+	adminResp := decodeMarketplaceResponse(t, adminRecorder)
+	if adminResp.Success {
+		t.Fatalf("expected ordinary admin listing recovery to be rejected")
+	}
+
+	riskNoVerifyRecorder := performMarketplaceScopedRequestWithSession(
+		t,
+		http.MethodPut,
+		"/api/listing/admin/"+strconv.Itoa(created.Listing.Id)+"/status",
+		recoveryBody,
+		user.Id,
+		common.RoleAdminUser,
+		"market_risk",
+		false,
+		"req-listing-recovery-risk-no-verify",
+		"198.51.100.32",
+		func(engine *gin.Engine) {
+			engine.PUT("/api/listing/admin/:id/status", middleware.AdminAuth(), UpdateListingAdminStatus)
+		},
+	)
+	riskNoVerifyResp := decodeMarketplaceResponse(t, riskNoVerifyRecorder)
+	if riskNoVerifyResp.Success {
+		t.Fatalf("expected risk admin listing recovery without secure verification to be rejected")
+	}
+
+	riskRecorder := performMarketplaceScopedRequestWithSession(
+		t,
+		http.MethodPut,
+		"/api/listing/admin/"+strconv.Itoa(created.Listing.Id)+"/status",
+		recoveryBody,
+		user.Id,
+		common.RoleAdminUser,
+		"market_risk",
+		true,
+		"req-listing-recovery-risk-success",
+		"198.51.100.33",
+		func(engine *gin.Engine) {
+			engine.PUT("/api/listing/admin/:id/status", middleware.AdminAuth(), UpdateListingAdminStatus)
+		},
+	)
+	riskResp := decodeMarketplaceResponse(t, riskRecorder)
+	if !riskResp.Success {
+		t.Fatalf("expected risk admin listing recovery to succeed, got message: %s", riskResp.Message)
+	}
+
+	updated, err := model.GetListingByID(created.Listing.Id)
+	if err != nil {
+		t.Fatalf("failed to reload listing: %v", err)
+	}
+	if updated.Status != "active" || updated.AuditStatus != "approved" {
+		t.Fatalf("expected recovered listing to be active and approved, got %+v", updated)
 	}
 }
 

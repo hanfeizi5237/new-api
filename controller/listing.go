@@ -102,7 +102,23 @@ func UpdateListingAdminStatus(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if err := service.UpdateListingStatus(id, req.Status, req.AuditStatus, req.AuditRemark); err != nil {
+	currentListing, err := model.GetListingByID(id)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if isListingRecoveryAction(currentListing, req) {
+		if err := requireMarketplaceRiskAction(c, req.AuditRemark); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+	}
+	if err := service.UpdateListingStatus(id, req.Status, req.AuditStatus, req.AuditRemark, service.MarketplaceAuditActor{
+		ActorUserID: c.GetInt("id"),
+		ActorType:   "admin",
+		RequestID:   c.GetString(common.RequestIdKey),
+		IP:          c.ClientIP(),
+	}); err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -120,4 +136,17 @@ func UpdateListingAdminStatus(c *gin.Context) {
 		Listing: *listing,
 		SKUs:    skus,
 	})
+}
+
+func isListingRecoveryAction(current *model.Listing, req UpdateListingStatusRequest) bool {
+	if current == nil {
+		return false
+	}
+	if strings.TrimSpace(req.Status) != "active" {
+		return false
+	}
+	if current.AuditStatus != "approved" {
+		return false
+	}
+	return current.Status == "paused" || current.Status == "sold_out"
 }

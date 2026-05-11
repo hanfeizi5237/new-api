@@ -180,8 +180,14 @@ func SetApiRouter(router *gin.Engine) {
 			marketplaceAdminRoute.GET("/seller-secrets", controller.GetSellerSecretsAdmin)
 			marketplaceAdminRoute.POST("/seller-secrets", controller.CreateSellerSecretAdmin)
 			marketplaceAdminRoute.POST("/seller-secrets/:id/verify", controller.VerifySellerSecretAdmin)
-			marketplaceAdminRoute.POST("/seller-secrets/:id/disable", controller.DisableSellerSecretAdmin)
-			marketplaceAdminRoute.POST("/seller-secrets/:id/recover", controller.RecoverSellerSecretAdmin)
+		}
+
+		marketplaceRiskRoute := apiRouter.Group("/marketplace/admin")
+		marketplaceRiskRoute.Use(middleware.RootAuth())
+		marketplaceRiskRoute.Use(middleware.SecureVerificationRequired())
+		{
+			marketplaceRiskRoute.POST("/seller-secrets/:id/disable", controller.DisableSellerSecretAdmin)
+			marketplaceRiskRoute.POST("/seller-secrets/:id/recover", controller.RecoverSellerSecretAdmin)
 		}
 
 		listingAdminRoute := apiRouter.Group("/listing/admin")

@@ -156,7 +156,7 @@ func CreateListingSKUs(skus []ListingSKU) error {
 	return DB.Create(&skus).Error
 }
 
-func UpdateListingStatus(id int, status string, auditStatus string, auditRemark string) error {
+func UpdateListingStatusTx(tx *gorm.DB, id int, status string, auditStatus string, auditRemark string) error {
 	updates := map[string]interface{}{
 		"updated_at": common.GetTimestamp(),
 	}
@@ -169,7 +169,11 @@ func UpdateListingStatus(id int, status string, auditStatus string, auditRemark 
 	if auditRemark != "" {
 		updates["audit_remark"] = auditRemark
 	}
-	return DB.Model(&Listing{}).Where("id = ?", id).Updates(updates).Error
+	return tx.Model(&Listing{}).Where("id = ?", id).Updates(updates).Error
+}
+
+func UpdateListingStatus(id int, status string, auditStatus string, auditRemark string) error {
+	return UpdateListingStatusTx(DB, id, status, auditStatus, auditRemark)
 }
 
 func GetInventorySnapshotBySupplyAccountID(supplyAccountId int) (*InventorySnapshot, error) {

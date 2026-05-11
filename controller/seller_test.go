@@ -98,4 +98,39 @@ func TestSellerAdminCreateListAndUpdateStatus(t *testing.T) {
 	if updated.Status != "disabled" || updated.Remark != "risk-review" {
 		t.Fatalf("expected disabled seller with remark, got %+v", updated)
 	}
+
+	var audits []model.MarketplaceOperationAudit
+	if err := db.Order("id asc").Find(&audits).Error; err != nil {
+		t.Fatalf("failed to load seller audits: %v", err)
+	}
+	if len(audits) != 1 {
+		t.Fatalf("expected exactly one seller audit, got %d", len(audits))
+	}
+	if audits[0].Action != "seller_status_update" || audits[0].TargetType != "seller" {
+		t.Fatalf("expected seller audit action/target, got %+v", audits[0])
+	}
+	if audits[0].ActorUserId != user.Id || audits[0].ActorType != "admin" {
+		t.Fatalf("expected seller audit actor info, got %+v", audits[0])
+	}
+	if audits[0].Reason != "risk-review" || audits[0].Result != "success" {
+		t.Fatalf("expected seller audit reason/result, got %+v", audits[0])
+	}
+	beforeState := map[string]interface{}{}
+	if err := common.UnmarshalJsonStr(audits[0].BeforeState, &beforeState); err != nil {
+		t.Fatalf("failed to decode seller before_state: %v", err)
+	}
+	afterState := map[string]interface{}{}
+	if err := common.UnmarshalJsonStr(audits[0].AfterState, &afterState); err != nil {
+		t.Fatalf("failed to decode seller after_state: %v", err)
+	}
+	if beforeState["status"] != "active" || afterState["status"] != "disabled" {
+		t.Fatalf("expected seller status transition active->disabled, got before=%+v after=%+v", beforeState, afterState)
+	}
+	meta := map[string]interface{}{}
+	if err := common.UnmarshalJsonStr(audits[0].Meta, &meta); err != nil {
+		t.Fatalf("failed to decode seller audit meta: %v", err)
+	}
+	if meta["seller_user_id"] != float64(user.Id) {
+		t.Fatalf("expected seller audit meta seller_user_id=%d, got %+v", user.Id, meta)
+	}
 }

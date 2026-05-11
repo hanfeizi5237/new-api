@@ -94,11 +94,15 @@ func CreateSeller(seller *SellerProfile) error {
 	return DB.Create(seller).Error
 }
 
-func UpdateSellerStatus(id int, status string, remark string) error {
+func UpdateSellerStatusTx(tx *gorm.DB, id int, status string, remark string) error {
 	updates := map[string]interface{}{
 		"status":     status,
 		"remark":     remark,
 		"updated_at": common.GetTimestamp(),
 	}
-	return DB.Model(&SellerProfile{}).Where("id = ?", id).Updates(updates).Error
+	return tx.Model(&SellerProfile{}).Where("id = ?", id).Updates(updates).Error
+}
+
+func UpdateSellerStatus(id int, status string, remark string) error {
+	return UpdateSellerStatusTx(DB, id, status, remark)
 }

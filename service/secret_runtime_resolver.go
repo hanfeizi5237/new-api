@@ -416,7 +416,7 @@ func recordSellerSecretAuditTx(tx *gorm.DB, audit model.SellerSecretAudit) error
 	return tx.Create(&audit).Error
 }
 
-func markSellerSecretVerificationFailureTx(tx *gorm.DB, secret *model.SellerSecret, actorUserId int, verifyMessage string) error {
+func markSellerSecretVerificationFailureTx(tx *gorm.DB, secret *model.SellerSecret, actor SellerSecretAuditActor, verifyMessage string) error {
 	now := common.GetTimestamp()
 	newStatus := secret.Status
 	switch secret.Status {
@@ -435,15 +435,14 @@ func markSellerSecretVerificationFailureTx(tx *gorm.DB, secret *model.SellerSecr
 	}).Error; err != nil {
 		return err
 	}
-	return recordSellerSecretAuditTx(tx, model.SellerSecretAudit{
-		SellerSecretId:  secret.Id,
-		SellerId:        secret.SellerId,
-		SupplyAccountId: secret.SupplyAccountId,
-		ActorUserId:     actorUserId,
-		ActorType:       "admin",
-		Action:          "verify_failed",
-		Reason:          verifyMessage,
-		Result:          "failed",
-		Meta:            verifyMessage,
-	})
+	return recordSellerSecretAuditTx(tx, buildSellerSecretAuditRecordWithExtraMeta(
+		secret,
+		actor,
+		"verify_failed",
+		verifyMessage,
+		"failed",
+		map[string]any{
+			"verify_message": verifyMessage,
+		},
+	))
 }

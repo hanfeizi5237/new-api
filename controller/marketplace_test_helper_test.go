@@ -14,7 +14,10 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -49,6 +52,7 @@ func setupMarketplaceControllerTestDB(t *testing.T) *gorm.DB {
 		&model.Channel{},
 		&model.Log{},
 		&model.SellerProfile{},
+		&model.MarketplaceOperationAudit{},
 		&model.SupplyAccount{},
 		&model.SellerSecret{},
 		&model.SellerSecretAudit{},
@@ -227,4 +231,173 @@ func decodeMarketplaceResponse(t *testing.T, recorder *httptest.ResponseRecorder
 		t.Fatalf("failed to decode marketplace api response: %v", err)
 	}
 	return response
+}
+
+func performMarketplaceRequestWithSession(t *testing.T, method string, target string, body any, actorUserId int, secureVerified bool, routeSetup func(*gin.Engine)) *httptest.ResponseRecorder {
+	t.Helper()
+
+	var requestBody *bytes.Reader
+	if body != nil {
+		payload, err := common.Marshal(body)
+		if err != nil {
+			t.Fatalf("failed to marshal request body: %v", err)
+		}
+		requestBody = bytes.NewReader(payload)
+	} else {
+		requestBody = bytes.NewReader(nil)
+	}
+
+	recorder := httptest.NewRecorder()
+	engine := gin.New()
+	engine.Use(sessions.Sessions("session", cookie.NewStore([]byte("marketplace-controller-test-secret"))))
+	engine.Use(func(c *gin.Context) {
+		c.Set("id", actorUserId)
+		c.Set("role", common.RoleRootUser)
+		if secureVerified {
+			session := sessions.Default(c)
+			session.Set(middleware.SecureVerificationSessionKey, common.GetTimestamp())
+			session.Set("secure_verified_method", "2fa")
+			if err := session.Save(); err != nil {
+				t.Fatalf("failed to seed secure verification session: %v", err)
+			}
+		}
+		c.Next()
+	})
+	routeSetup(engine)
+
+	request := httptest.NewRequest(method, target, requestBody)
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	engine.ServeHTTP(recorder, request)
+	return recorder
+}
+
+func performMarketplaceAuthedRequestWithSession(
+	t *testing.T,
+	method string,
+	target string,
+	body any,
+	actorUserId int,
+	actorRole int,
+	secureVerified bool,
+	requestID string,
+	clientIP string,
+	routeSetup func(*gin.Engine),
+) *httptest.ResponseRecorder {
+	t.Helper()
+
+	var requestBody *bytes.Reader
+	if body != nil {
+		payload, err := common.Marshal(body)
+		if err != nil {
+			t.Fatalf("failed to marshal request body: %v", err)
+		}
+		requestBody = bytes.NewReader(payload)
+	} else {
+		requestBody = bytes.NewReader(nil)
+	}
+
+	recorder := httptest.NewRecorder()
+	engine := gin.New()
+	engine.Use(sessions.Sessions("session", cookie.NewStore([]byte("marketplace-auth-controller-test-secret"))))
+	engine.Use(func(c *gin.Context) {
+		session := sessions.Default(c)
+		session.Set("id", actorUserId)
+		session.Set("username", "marketplace-auth-user")
+		session.Set("role", actorRole)
+		session.Set("status", common.UserStatusEnabled)
+		session.Set("group", "default")
+		if secureVerified {
+			session.Set(middleware.SecureVerificationSessionKey, common.GetTimestamp())
+			session.Set("secure_verified_method", "2fa")
+		}
+		if err := session.Save(); err != nil {
+			t.Fatalf("failed to seed auth session: %v", err)
+		}
+		c.Next()
+	})
+	if requestID != "" {
+		engine.Use(func(c *gin.Context) {
+			c.Set(common.RequestIdKey, requestID)
+			c.Next()
+		})
+	}
+	routeSetup(engine)
+
+	request := httptest.NewRequest(method, target, requestBody)
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	request.Header.Set("New-Api-User", fmt.Sprintf("%d", actorUserId))
+	if clientIP != "" {
+		request.RemoteAddr = clientIP + ":12345"
+	}
+	engine.ServeHTTP(recorder, request)
+	return recorder
+}
+
+func performMarketplaceScopedRequestWithSession(
+	t *testing.T,
+	method string,
+	target string,
+	body any,
+	actorUserId int,
+	actorRole int,
+	actorGroup string,
+	secureVerified bool,
+	requestID string,
+	clientIP string,
+	routeSetup func(*gin.Engine),
+) *httptest.ResponseRecorder {
+	t.Helper()
+
+	var requestBody *bytes.Reader
+	if body != nil {
+		payload, err := common.Marshal(body)
+		if err != nil {
+			t.Fatalf("failed to marshal request body: %v", err)
+		}
+		requestBody = bytes.NewReader(payload)
+	} else {
+		requestBody = bytes.NewReader(nil)
+	}
+
+	recorder := httptest.NewRecorder()
+	engine := gin.New()
+	engine.Use(sessions.Sessions("session", cookie.NewStore([]byte("marketplace-scoped-controller-test-secret"))))
+	engine.Use(func(c *gin.Context) {
+		session := sessions.Default(c)
+		session.Set("id", actorUserId)
+		session.Set("username", "marketplace-scoped-user")
+		session.Set("role", actorRole)
+		session.Set("status", common.UserStatusEnabled)
+		session.Set("group", actorGroup)
+		if secureVerified {
+			session.Set(middleware.SecureVerificationSessionKey, common.GetTimestamp())
+			session.Set("secure_verified_method", "2fa")
+		}
+		if err := session.Save(); err != nil {
+			t.Fatalf("failed to seed scoped auth session: %v", err)
+		}
+		c.Next()
+	})
+	if requestID != "" {
+		engine.Use(func(c *gin.Context) {
+			c.Set(common.RequestIdKey, requestID)
+			c.Next()
+		})
+	}
+	routeSetup(engine)
+
+	request := httptest.NewRequest(method, target, requestBody)
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	request.Header.Set("New-Api-User", fmt.Sprintf("%d", actorUserId))
+	if clientIP != "" {
+		request.RemoteAddr = clientIP + ":12345"
+	}
+	engine.ServeHTTP(recorder, request)
+	return recorder
 }

@@ -20,13 +20,24 @@ type CreateSellerSecretInput struct {
 	Meta            string
 }
 
+type SellerSecretAuditActor struct {
+	ActorUserID int
+	ActorType   string
+	RequestID   string
+	IP          string
+	Meta        string
+}
+
 func ListSellerSecrets(sellerId int, supplyAccountId int, status string, offset int, limit int) ([]*model.SellerSecret, int64, error) {
 	return model.GetSellerSecrets(sellerId, supplyAccountId, status, offset, limit)
 }
 
-func CreateSellerSecret(input CreateSellerSecretInput, actorUserId int, reason string) (*model.SellerSecret, error) {
+func CreateSellerSecret(input CreateSellerSecretInput, actor SellerSecretAuditActor, reason string) (*model.SellerSecret, error) {
 	if input.SellerId <= 0 || input.SupplyAccountId <= 0 {
 		return nil, errors.New("seller_id and supply_account_id are required")
+	}
+	if actor.ActorUserID <= 0 {
+		return nil, errors.New("actor_user_id is required")
 	}
 	normalizedPlaintext, err := normalizeSellerSecretPlaintext(input.SecretType, input.Plaintext)
 	if err != nil {
@@ -87,16 +98,7 @@ func CreateSellerSecret(input CreateSellerSecretInput, actorUserId int, reason s
 		if err := tx.Create(secret).Error; err != nil {
 			return err
 		}
-		audit := model.SellerSecretAudit{
-			SellerSecretId:  secret.Id,
-			SellerId:        secret.SellerId,
-			SupplyAccountId: secret.SupplyAccountId,
-			ActorUserId:     actorUserId,
-			ActorType:       "admin",
-			Action:          "create",
-			Reason:          reason,
-			Result:          "success",
-		}
+		audit := buildSellerSecretAuditRecord(secret, actor, "create", reason, "success")
 		if err := tx.Create(&audit).Error; err != nil {
 			return err
 		}
@@ -106,12 +108,15 @@ func CreateSellerSecret(input CreateSellerSecretInput, actorUserId int, reason s
 	if err != nil {
 		return nil, err
 	}
-	recordSellerSecretOperationLog(actorUserId, createdSecret, "import", "success", reason)
+	recordSellerSecretOperationLog(actor.ActorUserID, createdSecret, "import", "success", reason)
 	syncMarketplaceInventoryAfterMutation(createdSecret.SupplyAccountId, "seller_secret_created")
 	return secret, nil
 }
 
-func DisableSellerSecret(id int, actorUserId int, reason string) (*model.SellerSecret, error) {
+func DisableSellerSecret(id int, actor SellerSecretAuditActor, reason string) (*model.SellerSecret, error) {
+	if actor.ActorUserID <= 0 {
+		return nil, errors.New("actor_user_id is required")
+	}
 	secret, err := model.GetSellerSecretByID(id)
 	if err != nil {
 		return nil, err
@@ -128,16 +133,7 @@ func DisableSellerSecret(id int, actorUserId int, reason string) (*model.SellerS
 		}).Error; err != nil {
 			return err
 		}
-		audit := model.SellerSecretAudit{
-			SellerSecretId:  secret.Id,
-			SellerId:        secret.SellerId,
-			SupplyAccountId: secret.SupplyAccountId,
-			ActorUserId:     actorUserId,
-			ActorType:       "admin",
-			Action:          "disable",
-			Reason:          reason,
-			Result:          "success",
-		}
+		audit := buildSellerSecretAuditRecord(secret, actor, "disable", reason, "success")
 		if err := tx.Create(&audit).Error; err != nil {
 			return err
 		}
@@ -146,12 +142,15 @@ func DisableSellerSecret(id int, actorUserId int, reason string) (*model.SellerS
 	if err != nil {
 		return nil, err
 	}
-	recordSellerSecretOperationLog(actorUserId, secret, "disable", "success", reason)
+	recordSellerSecretOperationLog(actor.ActorUserID, secret, "disable", "success", reason)
 	syncMarketplaceInventoryAfterMutation(secret.SupplyAccountId, "seller_secret_disabled")
 	return model.GetSellerSecretByID(id)
 }
 
-func RecoverSellerSecret(id int, actorUserId int, reason string) (*model.SellerSecret, error) {
+func RecoverSellerSecret(id int, actor SellerSecretAuditActor, reason string) (*model.SellerSecret, error) {
+	if actor.ActorUserID <= 0 {
+		return nil, errors.New("actor_user_id is required")
+	}
 	secret, err := model.GetSellerSecretByID(id)
 	if err != nil {
 		return nil, err
@@ -167,16 +166,7 @@ func RecoverSellerSecret(id int, actorUserId int, reason string) (*model.SellerS
 		}).Error; err != nil {
 			return err
 		}
-		audit := model.SellerSecretAudit{
-			SellerSecretId:  secret.Id,
-			SellerId:        secret.SellerId,
-			SupplyAccountId: secret.SupplyAccountId,
-			ActorUserId:     actorUserId,
-			ActorType:       "admin",
-			Action:          "recover",
-			Reason:          reason,
-			Result:          "success",
-		}
+		audit := buildSellerSecretAuditRecord(secret, actor, "recover", reason, "success")
 		if err := tx.Create(&audit).Error; err != nil {
 			return err
 		}
@@ -185,9 +175,77 @@ func RecoverSellerSecret(id int, actorUserId int, reason string) (*model.SellerS
 	if err != nil {
 		return nil, err
 	}
-	recordSellerSecretOperationLog(actorUserId, secret, "recover", "success", reason)
+	recordSellerSecretOperationLog(actor.ActorUserID, secret, "recover", "success", reason)
 	syncMarketplaceInventoryAfterMutation(secret.SupplyAccountId, "seller_secret_recovered")
 	return model.GetSellerSecretByID(id)
+}
+
+func buildSellerSecretAuditRecord(
+	secret *model.SellerSecret,
+	actor SellerSecretAuditActor,
+	action string,
+	reason string,
+	result string,
+) model.SellerSecretAudit {
+	actorType := strings.TrimSpace(actor.ActorType)
+	if actorType == "" {
+		actorType = "admin"
+	}
+	meta := strings.TrimSpace(actor.Meta)
+	if meta == "" && (strings.TrimSpace(actor.RequestID) != "" || strings.TrimSpace(actor.IP) != "") {
+		meta = common.MapToJsonStr(map[string]any{
+			"request_id": strings.TrimSpace(actor.RequestID),
+			"ip":         strings.TrimSpace(actor.IP),
+		})
+	}
+	return model.SellerSecretAudit{
+		SellerSecretId:  secret.Id,
+		SellerId:        secret.SellerId,
+		SupplyAccountId: secret.SupplyAccountId,
+		ActorUserId:     actor.ActorUserID,
+		ActorType:       actorType,
+		Action:          action,
+		Reason:          reason,
+		RequestId:       strings.TrimSpace(actor.RequestID),
+		Ip:              strings.TrimSpace(actor.IP),
+		Result:          result,
+		Meta:            meta,
+	}
+}
+
+func buildSellerSecretAuditRecordWithExtraMeta(
+	secret *model.SellerSecret,
+	actor SellerSecretAuditActor,
+	action string,
+	reason string,
+	result string,
+	extraMeta map[string]any,
+) model.SellerSecretAudit {
+	audit := buildSellerSecretAuditRecord(secret, actor, action, reason, result)
+	audit.Meta = mergeSellerSecretAuditMeta(audit.Meta, extraMeta)
+	return audit
+}
+
+func mergeSellerSecretAuditMeta(baseMeta string, extraMeta map[string]any) string {
+	if len(extraMeta) == 0 {
+		return strings.TrimSpace(baseMeta)
+	}
+	merged := map[string]any{}
+	trimmedBaseMeta := strings.TrimSpace(baseMeta)
+	if trimmedBaseMeta != "" {
+		if err := common.UnmarshalJsonStr(trimmedBaseMeta, &merged); err != nil {
+			merged = map[string]any{
+				"raw_meta": trimmedBaseMeta,
+			}
+		}
+	}
+	for key, value := range extraMeta {
+		merged[key] = value
+	}
+	if len(merged) == 0 {
+		return ""
+	}
+	return common.MapToJsonStr(merged)
 }
 
 func recordSellerSecretOperationLog(actorUserId int, secret *model.SellerSecret, action string, result string, reason string) {

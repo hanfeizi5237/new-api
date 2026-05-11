@@ -1,10 +1,12 @@
 package service
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"gorm.io/gorm"
 )
 
 func TestCreateSellerWithSupplyRejectsInvalidChannelBinding(t *testing.T) {
@@ -131,5 +133,111 @@ func TestCreateSellerWithSupplyRequiresActiveVendor(t *testing.T) {
 		},
 	}); err == nil {
 		t.Fatalf("expected disabled vendor to be rejected")
+	}
+}
+
+func TestUpdateSellerStatusCreatesTransactionalAudit(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+	user := seedMarketplaceServiceUser(t, db, "svc-seller-audit")
+	seller, _ := seedMarketplaceServiceSupply(t, db, user, "active", "success", "token")
+
+	err := UpdateSellerStatus(seller.Id, "disabled", "risk-review", MarketplaceAuditActor{
+		ActorUserID: user.Id,
+		ActorType:   "admin",
+		RequestID:   "req-seller-audit-001",
+		IP:          "127.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("expected seller status update success, got %v", err)
+	}
+
+	updated, err := model.GetSellerByID(seller.Id)
+	if err != nil {
+		t.Fatalf("failed to reload seller: %v", err)
+	}
+	if updated.Status != "disabled" || updated.Remark != "risk-review" {
+		t.Fatalf("expected updated seller status/remark, got %+v", updated)
+	}
+
+	var audits []model.MarketplaceOperationAudit
+	if err := db.Order("id asc").Find(&audits).Error; err != nil {
+		t.Fatalf("failed to load seller audits: %v", err)
+	}
+	if len(audits) != 1 {
+		t.Fatalf("expected exactly one seller audit, got %d", len(audits))
+	}
+	if audits[0].Action != "seller_status_update" || audits[0].TargetId != seller.Id {
+		t.Fatalf("expected seller audit action/target, got %+v", audits[0])
+	}
+}
+
+func TestUpdateSellerStatusAuditSeesUpdatedStateWithinSameTransaction(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+	user := seedMarketplaceServiceUser(t, db, "svc-seller-audit-tx")
+	seller, _ := seedMarketplaceServiceSupply(t, db, user, "active", "success", "token")
+
+	previousWriter := marketplaceOperationAuditWriter
+	marketplaceOperationAuditWriter = func(tx *gorm.DB, audit *model.MarketplaceOperationAudit) error {
+		var reloaded model.SellerProfile
+		if err := tx.First(&reloaded, seller.Id).Error; err != nil {
+			return err
+		}
+		if reloaded.Status != "disabled" || reloaded.Remark != "risk-review" {
+			return errors.New("seller update not visible inside audit transaction")
+		}
+		return previousWriter(tx, audit)
+	}
+	t.Cleanup(func() {
+		marketplaceOperationAuditWriter = previousWriter
+	})
+
+	err := UpdateSellerStatus(seller.Id, "disabled", "risk-review", MarketplaceAuditActor{
+		ActorUserID: user.Id,
+		ActorType:   "admin",
+		RequestID:   "req-seller-audit-tx-001",
+		IP:          "127.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("expected seller status update success, got %v", err)
+	}
+}
+
+func TestUpdateSellerStatusRollsBackWhenAuditInsertFails(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+	user := seedMarketplaceServiceUser(t, db, "svc-seller-audit-rollback")
+	seller, _ := seedMarketplaceServiceSupply(t, db, user, "active", "success", "token")
+
+	previousWriter := marketplaceOperationAuditWriter
+	marketplaceOperationAuditWriter = func(tx *gorm.DB, audit *model.MarketplaceOperationAudit) error {
+		return errors.New("forced seller audit failure")
+	}
+	t.Cleanup(func() {
+		marketplaceOperationAuditWriter = previousWriter
+	})
+
+	err := UpdateSellerStatus(seller.Id, "disabled", "risk-review", MarketplaceAuditActor{
+		ActorUserID: user.Id,
+		ActorType:   "admin",
+		RequestID:   "req-seller-audit-rollback-001",
+		IP:          "127.0.0.1",
+	})
+	if err == nil {
+		t.Fatalf("expected seller status update to fail when audit insert fails")
+	}
+
+	reloaded, err := model.GetSellerByID(seller.Id)
+	if err != nil {
+		t.Fatalf("failed to reload seller after rollback: %v", err)
+	}
+	if reloaded.Status != "active" || reloaded.Remark != "" {
+		t.Fatalf("expected seller state rollback to active/empty remark, got %+v", reloaded)
+	}
+
+	var count int64
+	if err := db.Model(&model.MarketplaceOperationAudit{}).Count(&count).Error; err != nil {
+		t.Fatalf("failed to count seller audits: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected zero seller audits after rollback, got %d", count)
 	}
 }

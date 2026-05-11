@@ -10,6 +10,9 @@ import (
 )
 
 func TestMarketplaceMigration(t *testing.T) {
+	// SQLite is the always-on migration smoke path for this suite.
+	// The repository also has optional MySQL marketplace acceptance tests in service/marketplace_mysql_acceptance_test.go.
+	// PostgreSQL marketplace acceptance is not wired in this repo yet, so this test should not be read as PostgreSQL coverage.
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 
@@ -19,6 +22,7 @@ func TestMarketplaceMigration(t *testing.T) {
 
 	require.NoError(t, db.AutoMigrate(
 		&SellerProfile{},
+		&MarketplaceOperationAudit{},
 		&SupplyAccount{},
 		&SellerSecret{},
 		&SellerSecretAudit{},
@@ -34,6 +38,7 @@ func TestMarketplaceMigration(t *testing.T) {
 	))
 
 	assert.True(t, db.Migrator().HasTable(&SellerProfile{}))
+	assert.True(t, db.Migrator().HasTable(&MarketplaceOperationAudit{}))
 	assert.True(t, db.Migrator().HasTable(&SupplyAccount{}))
 	assert.True(t, db.Migrator().HasTable(&SellerSecret{}))
 	assert.True(t, db.Migrator().HasTable(&Listing{}))
@@ -43,6 +48,7 @@ func TestMarketplaceMigration(t *testing.T) {
 
 	assert.True(t, db.Migrator().HasIndex(&SellerProfile{}, "ux_seller_profiles_user_id"))
 	assert.True(t, db.Migrator().HasIndex(&SellerProfile{}, "ux_seller_profiles_seller_code"))
+	assert.True(t, db.Migrator().HasIndex(&MarketplaceOperationAudit{}, "idx_marketplace_operation_audits_target"))
 	assert.True(t, db.Migrator().HasIndex(&SupplyAccount{}, "ux_supply_accounts_supply_code"))
 	assert.True(t, db.Migrator().HasIndex(&SellerSecret{}, "ux_seller_secrets_supply_fingerprint"))
 	assert.True(t, db.Migrator().HasIndex(&SupplyChannelBinding{}, "ux_supply_channel_bindings_supply_channel"))

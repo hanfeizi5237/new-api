@@ -9,7 +9,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func VerifySellerSecret(id int, actorUserId int) (*model.SellerSecret, error) {
+func VerifySellerSecret(id int, actor SellerSecretAuditActor) (*model.SellerSecret, error) {
+	if actor.ActorUserID <= 0 {
+		return nil, fmt.Errorf("actor_user_id is required")
+	}
 	secret, err := model.GetSellerSecretByID(id)
 	if err != nil {
 		return nil, err
@@ -21,7 +24,7 @@ func VerifySellerSecret(id int, actorUserId int) (*model.SellerSecret, error) {
 	var verifyLogReason string
 	err = model.DB.Transaction(func(tx *gorm.DB) error {
 		if verifyErr != nil {
-			if err := markSellerSecretVerificationFailureTx(tx, secret, actorUserId, verifyErr.Error()); err != nil {
+			if err := markSellerSecretVerificationFailureTx(tx, secret, actor, verifyErr.Error()); err != nil {
 				return err
 			}
 			return recomputeSupplyAccountSecretStateTx(tx, secret.SupplyAccountId)
@@ -29,7 +32,7 @@ func VerifySellerSecret(id int, actorUserId int) (*model.SellerSecret, error) {
 
 		if err := prepareSellerSecretActivationTx(tx, secret.SupplyAccountId, secret.Id); err != nil {
 			verifyErr = err
-			if err := markSellerSecretVerificationFailureTx(tx, secret, actorUserId, verifyErr.Error()); err != nil {
+			if err := markSellerSecretVerificationFailureTx(tx, secret, actor, verifyErr.Error()); err != nil {
 				return err
 			}
 			return recomputeSupplyAccountSecretStateTx(tx, secret.SupplyAccountId)
@@ -37,14 +40,14 @@ func VerifySellerSecret(id int, actorUserId int) (*model.SellerSecret, error) {
 
 		if err := probeSellerSecretBindingsTx(tx, secret); err != nil {
 			verifyErr = err
-			if err := markSellerSecretVerificationFailureTx(tx, secret, actorUserId, verifyErr.Error()); err != nil {
+			if err := markSellerSecretVerificationFailureTx(tx, secret, actor, verifyErr.Error()); err != nil {
 				return err
 			}
 			return recomputeSupplyAccountSecretStateTx(tx, secret.SupplyAccountId)
 		}
 		if err := sellerSecretLiveProbeFunc(secret, runtimeKey); err != nil {
 			verifyErr = err
-			if err := markSellerSecretVerificationFailureTx(tx, secret, actorUserId, verifyErr.Error()); err != nil {
+			if err := markSellerSecretVerificationFailureTx(tx, secret, actor, verifyErr.Error()); err != nil {
 				return err
 			}
 			return recomputeSupplyAccountSecretStateTx(tx, secret.SupplyAccountId)
@@ -53,7 +56,7 @@ func VerifySellerSecret(id int, actorUserId int) (*model.SellerSecret, error) {
 		channelIds, err := syncSellerSecretRuntimeMirrorTx(tx, secret, runtimeKey)
 		if err != nil {
 			verifyErr = err
-			if err := markSellerSecretVerificationFailureTx(tx, secret, actorUserId, verifyErr.Error()); err != nil {
+			if err := markSellerSecretVerificationFailureTx(tx, secret, actor, verifyErr.Error()); err != nil {
 				return err
 			}
 			return recomputeSupplyAccountSecretStateTx(tx, secret.SupplyAccountId)
@@ -73,29 +76,29 @@ func VerifySellerSecret(id int, actorUserId int) (*model.SellerSecret, error) {
 			return err
 		}
 
-		if err := recordSellerSecretAuditTx(tx, model.SellerSecretAudit{
-			SellerSecretId:  secret.Id,
-			SellerId:        secret.SellerId,
-			SupplyAccountId: secret.SupplyAccountId,
-			ActorUserId:     actorUserId,
-			ActorType:       "admin",
-			Action:          "verify_success",
-			Result:          "success",
-			Meta:            fmt.Sprintf("runtime_channels=%v", channelIds),
-		}); err != nil {
+		if err := recordSellerSecretAuditTx(tx, buildSellerSecretAuditRecordWithExtraMeta(
+			secret,
+			actor,
+			"verify_success",
+			"",
+			"success",
+			map[string]any{
+				"runtime_channels": channelIds,
+			},
+		)); err != nil {
 			return err
 		}
 
-		if err := recordSellerSecretAuditTx(tx, model.SellerSecretAudit{
-			SellerSecretId:  secret.Id,
-			SellerId:        secret.SellerId,
-			SupplyAccountId: secret.SupplyAccountId,
-			ActorUserId:     actorUserId,
-			ActorType:       "admin",
-			Action:          "sync_channel",
-			Result:          "success",
-			Meta:            fmt.Sprintf("runtime_channels=%v", channelIds),
-		}); err != nil {
+		if err := recordSellerSecretAuditTx(tx, buildSellerSecretAuditRecordWithExtraMeta(
+			secret,
+			actor,
+			"sync_channel",
+			"",
+			"success",
+			map[string]any{
+				"runtime_channels": channelIds,
+			},
+		)); err != nil {
 			return err
 		}
 
@@ -110,15 +113,15 @@ func VerifySellerSecret(id int, actorUserId int) (*model.SellerSecret, error) {
 		return nil, err
 	}
 	if verifyErr == nil {
-		recordSellerSecretOperationLog(actorUserId, updated, "verify", "success", "runtime mirror sync completed")
-		recordSellerSecretOperationLog(actorUserId, updated, "sync_channel", "success", fmt.Sprintf("channels=%v", syncedChannelIds))
+		recordSellerSecretOperationLog(actor.ActorUserID, updated, "verify", "success", "runtime mirror sync completed")
+		recordSellerSecretOperationLog(actor.ActorUserID, updated, "sync_channel", "success", fmt.Sprintf("channels=%v", syncedChannelIds))
 		refreshChannelCache(syncedChannelIds)
 		syncMarketplaceInventoryAfterMutation(updated.SupplyAccountId, "seller_secret_verified")
 		return updated, nil
 	}
 	verifyLogResult = "failed"
 	verifyLogReason = verifyErr.Error()
-	recordSellerSecretOperationLog(actorUserId, updated, "verify", verifyLogResult, verifyLogReason)
+	recordSellerSecretOperationLog(actor.ActorUserID, updated, "verify", verifyLogResult, verifyLogReason)
 	if strings.TrimSpace(updated.VerifyMessage) == "" {
 		updated.VerifyMessage = verifyErr.Error()
 	}

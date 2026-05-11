@@ -55,6 +55,50 @@ func TestEntitlementListBuyerEntitlementsSupportsModelFilter(t *testing.T) {
 	}
 }
 
+func TestEntitlementListBuyerEntitlementsIsScopedToBuyer(t *testing.T) {
+	db := setupMarketplaceServiceTestDB(t)
+	buyerA := seedMarketplaceServiceUser(t, db, "market-buyer-ent-scope-a")
+	buyerB := seedMarketplaceServiceUser(t, db, "market-buyer-ent-scope-b")
+	sellerUser := seedMarketplaceServiceUser(t, db, "market-seller-ent-scope")
+	_, supply := seedMarketplaceServiceSupply(t, db, sellerUser, "active", "success", "token")
+
+	entitlementA := &model.BuyerEntitlement{
+		BuyerUserId:  buyerA.Id,
+		VendorId:     supply.VendorId,
+		ModelName:    supply.ModelName,
+		TotalGranted: 2000,
+		Status:       "active",
+	}
+	if err := db.Create(entitlementA).Error; err != nil {
+		t.Fatalf("failed to create buyer A entitlement: %v", err)
+	}
+
+	entitlementB := &model.BuyerEntitlement{
+		BuyerUserId:  buyerB.Id,
+		VendorId:     supply.VendorId,
+		ModelName:    supply.ModelName,
+		TotalGranted: 4000,
+		Status:       "active",
+	}
+	if err := db.Create(entitlementB).Error; err != nil {
+		t.Fatalf("failed to create buyer B entitlement: %v", err)
+	}
+
+	entitlements, total, err := ListBuyerEntitlements(buyerA.Id, supply.ModelName, 0, 20)
+	if err != nil {
+		t.Fatalf("list buyer entitlements returned error: %v", err)
+	}
+	if total != 1 || len(entitlements) != 1 {
+		t.Fatalf("expected exactly one entitlement for buyer A, got total=%d len=%d", total, len(entitlements))
+	}
+	if entitlements[0].Id != entitlementA.Id || entitlements[0].BuyerUserId != buyerA.Id {
+		t.Fatalf("expected buyer A entitlement only, got %+v", entitlements[0])
+	}
+	if entitlements[0].Id == entitlementB.Id {
+		t.Fatalf("buyer A entitlement query leaked buyer B entitlement id=%d", entitlementB.Id)
+	}
+}
+
 func TestGrantEntitlementsForOrderRecoversFromDuplicateBuyerEntitlementCreate(t *testing.T) {
 	db := setupMarketplaceServiceTestDB(t)
 	buyer := seedMarketplaceServiceUser(t, db, "market-buyer-ent-duplicate")
