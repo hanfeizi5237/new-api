@@ -110,6 +110,16 @@ const paymentSchema = z.object({
   StripeUnitPrice: z.coerce.number().min(0),
   StripeMinTopUp: z.coerce.number().min(0),
   StripePromotionCodesEnabled: z.boolean(),
+  AlipayAppId: z.string(),
+  AlipayPrivateKey: z.string(),
+  AlipayPublicKey: z.string(),
+  AlipayNotifyUrl: z.string(),
+  WxpayAppId: z.string(),
+  WxpayMchId: z.string(),
+  WxpayPrivateKey: z.string(),
+  WxpayApiV3Key: z.string(),
+  WxpayCertSerial: z.string(),
+  WxpayNotifyUrl: z.string(),
   CreemApiKey: z.string(),
   CreemWebhookSecret: z.string(),
   CreemTestMode: z.boolean(),
@@ -430,6 +440,137 @@ export function PaymentSettingsSection({
     }
   }
 
+  const saveAlipaySettings = async () => {
+    const values = form.getValues()
+    const sanitized = {
+      AlipayAppId: values.AlipayAppId.trim(),
+      AlipayPrivateKey: values.AlipayPrivateKey.trim(),
+      AlipayPublicKey: values.AlipayPublicKey.trim(),
+      AlipayNotifyUrl: removeTrailingSlash(values.AlipayNotifyUrl),
+    }
+
+    const initial = {
+      AlipayAppId: initialRef.current.AlipayAppId.trim(),
+      AlipayPrivateKey: initialRef.current.AlipayPrivateKey.trim(),
+      AlipayPublicKey: initialRef.current.AlipayPublicKey.trim(),
+      AlipayNotifyUrl: removeTrailingSlash(initialRef.current.AlipayNotifyUrl),
+    }
+
+    const updates: Array<{ key: string; value: string }> = []
+
+    if (sanitized.AlipayAppId !== initial.AlipayAppId) {
+      updates.push({ key: 'AlipayAppId', value: sanitized.AlipayAppId })
+    }
+
+    if (
+      sanitized.AlipayPrivateKey &&
+      sanitized.AlipayPrivateKey !== initial.AlipayPrivateKey
+    ) {
+      updates.push({
+        key: 'AlipayPrivateKey',
+        value: sanitized.AlipayPrivateKey,
+      })
+    }
+
+    if (
+      sanitized.AlipayPublicKey &&
+      sanitized.AlipayPublicKey !== initial.AlipayPublicKey
+    ) {
+      updates.push({
+        key: 'AlipayPublicKey',
+        value: sanitized.AlipayPublicKey,
+      })
+    }
+
+    if (sanitized.AlipayNotifyUrl !== initial.AlipayNotifyUrl) {
+      updates.push({
+        key: 'AlipayNotifyUrl',
+        value: sanitized.AlipayNotifyUrl,
+      })
+    }
+
+    if (updates.length === 0) {
+      return
+    }
+
+    for (const update of updates) {
+      await updateOption.mutateAsync(update)
+    }
+  }
+
+  const saveWxpaySettings = async () => {
+    const values = form.getValues()
+    const sanitized = {
+      WxpayAppId: values.WxpayAppId.trim(),
+      WxpayMchId: values.WxpayMchId.trim(),
+      WxpayPrivateKey: values.WxpayPrivateKey.trim(),
+      WxpayApiV3Key: values.WxpayApiV3Key.trim(),
+      WxpayCertSerial: values.WxpayCertSerial.trim(),
+      WxpayNotifyUrl: removeTrailingSlash(values.WxpayNotifyUrl),
+    }
+
+    const initial = {
+      WxpayAppId: initialRef.current.WxpayAppId.trim(),
+      WxpayMchId: initialRef.current.WxpayMchId.trim(),
+      WxpayPrivateKey: initialRef.current.WxpayPrivateKey.trim(),
+      WxpayApiV3Key: initialRef.current.WxpayApiV3Key.trim(),
+      WxpayCertSerial: initialRef.current.WxpayCertSerial.trim(),
+      WxpayNotifyUrl: removeTrailingSlash(initialRef.current.WxpayNotifyUrl),
+    }
+
+    const updates: Array<{ key: string; value: string }> = []
+
+    if (sanitized.WxpayAppId !== initial.WxpayAppId) {
+      updates.push({ key: 'WxpayAppId', value: sanitized.WxpayAppId })
+    }
+
+    if (sanitized.WxpayMchId !== initial.WxpayMchId) {
+      updates.push({ key: 'WxpayMchId', value: sanitized.WxpayMchId })
+    }
+
+    if (
+      sanitized.WxpayPrivateKey &&
+      sanitized.WxpayPrivateKey !== initial.WxpayPrivateKey
+    ) {
+      updates.push({
+        key: 'WxpayPrivateKey',
+        value: sanitized.WxpayPrivateKey,
+      })
+    }
+
+    if (
+      sanitized.WxpayApiV3Key &&
+      sanitized.WxpayApiV3Key !== initial.WxpayApiV3Key
+    ) {
+      updates.push({
+        key: 'WxpayApiV3Key',
+        value: sanitized.WxpayApiV3Key,
+      })
+    }
+
+    if (sanitized.WxpayCertSerial !== initial.WxpayCertSerial) {
+      updates.push({
+        key: 'WxpayCertSerial',
+        value: sanitized.WxpayCertSerial,
+      })
+    }
+
+    if (sanitized.WxpayNotifyUrl !== initial.WxpayNotifyUrl) {
+      updates.push({
+        key: 'WxpayNotifyUrl',
+        value: sanitized.WxpayNotifyUrl,
+      })
+    }
+
+    if (updates.length === 0) {
+      return
+    }
+
+    for (const update of updates) {
+      await updateOption.mutateAsync(update)
+    }
+  }
+
   const onSubmit = async (values: PaymentFormValues) => {
     const sanitized = {
       PayAddress: removeTrailingSlash(values.PayAddress),
@@ -448,6 +589,16 @@ export function PaymentSettingsSection({
       StripeUnitPrice: values.StripeUnitPrice,
       StripeMinTopUp: values.StripeMinTopUp,
       StripePromotionCodesEnabled: values.StripePromotionCodesEnabled,
+      AlipayAppId: values.AlipayAppId.trim(),
+      AlipayPrivateKey: values.AlipayPrivateKey.trim(),
+      AlipayPublicKey: values.AlipayPublicKey.trim(),
+      AlipayNotifyUrl: removeTrailingSlash(values.AlipayNotifyUrl),
+      WxpayAppId: values.WxpayAppId.trim(),
+      WxpayMchId: values.WxpayMchId.trim(),
+      WxpayPrivateKey: values.WxpayPrivateKey.trim(),
+      WxpayApiV3Key: values.WxpayApiV3Key.trim(),
+      WxpayCertSerial: values.WxpayCertSerial.trim(),
+      WxpayNotifyUrl: removeTrailingSlash(values.WxpayNotifyUrl),
     }
 
     const initial = {
@@ -471,6 +622,16 @@ export function PaymentSettingsSection({
       StripeMinTopUp: initialRef.current.StripeMinTopUp,
       StripePromotionCodesEnabled:
         initialRef.current.StripePromotionCodesEnabled,
+      AlipayAppId: initialRef.current.AlipayAppId.trim(),
+      AlipayPrivateKey: initialRef.current.AlipayPrivateKey.trim(),
+      AlipayPublicKey: initialRef.current.AlipayPublicKey.trim(),
+      AlipayNotifyUrl: removeTrailingSlash(initialRef.current.AlipayNotifyUrl),
+      WxpayAppId: initialRef.current.WxpayAppId.trim(),
+      WxpayMchId: initialRef.current.WxpayMchId.trim(),
+      WxpayPrivateKey: initialRef.current.WxpayPrivateKey.trim(),
+      WxpayApiV3Key: initialRef.current.WxpayApiV3Key.trim(),
+      WxpayCertSerial: initialRef.current.WxpayCertSerial.trim(),
+      WxpayNotifyUrl: removeTrailingSlash(initialRef.current.WxpayNotifyUrl),
     }
 
     const updates: Array<{ key: string; value: string | number | boolean }> = []
@@ -575,6 +736,79 @@ export function PaymentSettingsSection({
       updates.push({
         key: 'StripePromotionCodesEnabled',
         value: sanitized.StripePromotionCodesEnabled,
+      })
+    }
+
+    if (sanitized.AlipayAppId !== initial.AlipayAppId) {
+      updates.push({ key: 'AlipayAppId', value: sanitized.AlipayAppId })
+    }
+
+    if (
+      sanitized.AlipayPrivateKey &&
+      sanitized.AlipayPrivateKey !== initial.AlipayPrivateKey
+    ) {
+      updates.push({
+        key: 'AlipayPrivateKey',
+        value: sanitized.AlipayPrivateKey,
+      })
+    }
+
+    if (
+      sanitized.AlipayPublicKey &&
+      sanitized.AlipayPublicKey !== initial.AlipayPublicKey
+    ) {
+      updates.push({
+        key: 'AlipayPublicKey',
+        value: sanitized.AlipayPublicKey,
+      })
+    }
+
+    if (sanitized.AlipayNotifyUrl !== initial.AlipayNotifyUrl) {
+      updates.push({
+        key: 'AlipayNotifyUrl',
+        value: sanitized.AlipayNotifyUrl,
+      })
+    }
+
+    if (sanitized.WxpayAppId !== initial.WxpayAppId) {
+      updates.push({ key: 'WxpayAppId', value: sanitized.WxpayAppId })
+    }
+
+    if (sanitized.WxpayMchId !== initial.WxpayMchId) {
+      updates.push({ key: 'WxpayMchId', value: sanitized.WxpayMchId })
+    }
+
+    if (
+      sanitized.WxpayPrivateKey &&
+      sanitized.WxpayPrivateKey !== initial.WxpayPrivateKey
+    ) {
+      updates.push({
+        key: 'WxpayPrivateKey',
+        value: sanitized.WxpayPrivateKey,
+      })
+    }
+
+    if (
+      sanitized.WxpayApiV3Key &&
+      sanitized.WxpayApiV3Key !== initial.WxpayApiV3Key
+    ) {
+      updates.push({
+        key: 'WxpayApiV3Key',
+        value: sanitized.WxpayApiV3Key,
+      })
+    }
+
+    if (sanitized.WxpayCertSerial !== initial.WxpayCertSerial) {
+      updates.push({
+        key: 'WxpayCertSerial',
+        value: sanitized.WxpayCertSerial,
+      })
+    }
+
+    if (sanitized.WxpayNotifyUrl !== initial.WxpayNotifyUrl) {
+      updates.push({
+        key: 'WxpayNotifyUrl',
+        value: sanitized.WxpayNotifyUrl,
       })
     }
 
@@ -1346,6 +1580,304 @@ export function PaymentSettingsSection({
               {updateOption.isPending
                 ? t('Saving...')
                 : t('Save Creem settings')}
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div className='space-y-4'>
+            <div>
+              <h3 className='text-lg font-medium'>{t('Alipay Gateway')}</h3>
+              <p className='text-muted-foreground text-sm'>
+                {t('Configuration for Alipay official payment integration')}
+              </p>
+            </div>
+
+            <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
+              <p className='mb-2 font-medium'>{t('Webhook Configuration:')}</p>
+              <ul className='list-inside list-disc space-y-1'>
+                <li>
+                  {t('Webhook URL:')}{' '}
+                  <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
+                    {'<ServerAddress>/api/alipay/notify'}
+                  </code>
+                </li>
+                <li>{t('Supports PC page pay and H5 pay')}</li>
+              </ul>
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='AlipayAppId'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('App ID')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('Alipay App ID')}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Alipay Open Platform App ID')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='AlipayNotifyUrl'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Notify URL')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('Optional custom notify URL')}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Leave blank to use default callback')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='AlipayPrivateKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Private Key')}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={4}
+                        placeholder={t('Paste Alipay RSA2 private key')}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Application private key (leave blank unless updating)')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='AlipayPublicKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Alipay Public Key')}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={4}
+                        placeholder={t('Paste Alipay public key for verification')}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Alipay public key for signature verification')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <Button
+              type='button'
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                saveAlipaySettings()
+              }}
+              disabled={updateOption.isPending}
+            >
+              {updateOption.isPending
+                ? t('Saving...')
+                : t('Save Alipay settings')}
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div className='space-y-4'>
+            <div>
+              <h3 className='text-lg font-medium'>{t('WeChat Pay Gateway')}</h3>
+              <p className='text-muted-foreground text-sm'>
+                {t('Configuration for WeChat Pay official payment integration')}
+              </p>
+            </div>
+
+            <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
+              <p className='mb-2 font-medium'>{t('Webhook Configuration:')}</p>
+              <ul className='list-inside list-disc space-y-1'>
+                <li>
+                  {t('Webhook URL:')}{' '}
+                  <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
+                    {'<ServerAddress>/api/wxpay/notify'}
+                  </code>
+                </li>
+                <li>{t('Supports Native QR code pay and H5 pay')}</li>
+              </ul>
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-3'>
+              <FormField
+                control={form.control}
+                name='WxpayAppId'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('App ID')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('WeChat App ID')}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('WeChat official account or mobile app AppID')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='WxpayMchId'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Merchant ID')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('WeChat merchant ID')}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('WeChat Pay merchant number')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='WxpayCertSerial'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Certificate Serial')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('API certificate serial number')}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Merchant API certificate serial')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='WxpayPrivateKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Private Key')}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={4}
+                        placeholder={t('Paste WeChat Pay merchant private key')}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('APIv3 private key (leave blank unless updating)')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='WxpayApiV3Key'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('APIv3 Key')}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={4}
+                        placeholder={t('Paste WeChat Pay APIv3 key')}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('For callback decryption and verification')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name='WxpayNotifyUrl'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Notify URL')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t('Optional custom notify URL')}
+                      {...field}
+                      onChange={(event) => field.onChange(event.target.value)}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t('Leave blank to use default callback')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Button
+              type='button'
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                saveWxpaySettings()
+              }}
+              disabled={updateOption.isPending}
+            >
+              {updateOption.isPending
+                ? t('Saving...')
+                : t('Save WeChat Pay settings')}
             </Button>
           </div>
 

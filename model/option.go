@@ -77,6 +77,19 @@ func InitOptionMap() {
 	common.OptionMap["CustomCallbackAddress"] = ""
 	common.OptionMap["EpayId"] = ""
 	common.OptionMap["EpayKey"] = ""
+	common.OptionMap["AlipayAppId"] = ""
+	common.OptionMap["AlipayPrivateKey"] = ""
+	common.OptionMap["AlipayPublicKey"] = ""
+	common.OptionMap["AlipayNotifyUrl"] = ""
+	common.OptionMap["AlipayReturnUrl"] = ""
+	common.OptionMap["WxpayAppId"] = ""
+	common.OptionMap["WxpayMchId"] = ""
+	common.OptionMap["WxpayPrivateKey"] = ""
+	common.OptionMap["WxpayApiV3Key"] = ""
+	common.OptionMap["WxpayCertSerial"] = ""
+	common.OptionMap["WxpayPublicKey"] = ""
+	common.OptionMap["WxpayPublicKeyId"] = ""
+	common.OptionMap["WxpayNotifyUrl"] = ""
 	common.OptionMap["Price"] = strconv.FormatFloat(operation_setting.Price, 'f', -1, 64)
 	common.OptionMap["USDExchangeRate"] = strconv.FormatFloat(operation_setting.USDExchangeRate, 'f', -1, 64)
 	common.OptionMap["MinTopUp"] = strconv.Itoa(operation_setting.MinTopUp)
@@ -364,6 +377,32 @@ func updateOptionMap(key string, value string) (err error) {
 		operation_setting.EpayId = value
 	case "EpayKey":
 		operation_setting.EpayKey = value
+	case "AlipayAppId":
+		operation_setting.AlipayAppId = value
+	case "AlipayPrivateKey":
+		operation_setting.AlipayPrivateKey = value
+	case "AlipayPublicKey":
+		operation_setting.AlipayPublicKey = value
+	case "AlipayNotifyUrl":
+		operation_setting.AlipayNotifyUrl = value
+	case "AlipayReturnUrl":
+		operation_setting.AlipayReturnUrl = value
+	case "WxpayAppId":
+		operation_setting.WxpayAppId = value
+	case "WxpayMchId":
+		operation_setting.WxpayMchId = value
+	case "WxpayPrivateKey":
+		operation_setting.WxpayPrivateKey = value
+	case "WxpayApiV3Key":
+		operation_setting.WxpayApiV3Key = value
+	case "WxpayCertSerial":
+		operation_setting.WxpayCertSerial = value
+	case "WxpayPublicKey":
+		operation_setting.WxpayPublicKey = value
+	case "WxpayPublicKeyId":
+		operation_setting.WxpayPublicKeyId = value
+	case "WxpayNotifyUrl":
+		operation_setting.WxpayNotifyUrl = value
 	case "Price":
 		operation_setting.Price, _ = strconv.ParseFloat(value, 64)
 	case "USDExchangeRate":

@@ -207,6 +207,16 @@ const TopUp = () => {
         showError(t('管理员未开启 Waffo 充值！'));
         return;
       }
+    } else if (payment === 'alipay_official') {
+      if (!statusState?.status?.enable_alipay_topup) {
+        showError(t('管理员未开启支付宝官方充值！'));
+        return;
+      }
+    } else if (payment === 'wxpay_official') {
+      if (!statusState?.status?.enable_wxpay_topup) {
+        showError(t('管理员未开启微信支付官方充值！'));
+        return;
+      }
     } else {
       if (!enableOnlineTopUp) {
         showError(t('管理员未开启在线充值！'));
@@ -281,6 +291,18 @@ const TopUp = () => {
           amount: parseInt(topUpCount),
           payment_method: 'stripe',
         });
+      } else if (payWay === 'alipay_official') {
+        // 支付宝官方支付请求
+        res = await API.post('/api/user/alipay/pay', {
+          amount: parseInt(topUpCount),
+          payment_method: payWay,
+        });
+      } else if (payWay === 'wxpay_official') {
+        // 微信支付官方支付请求
+        res = await API.post('/api/user/wxpay/pay', {
+          amount: parseInt(topUpCount),
+          payment_method: payWay,
+        });
       } else {
         // 普通支付请求
         res = await API.post('/api/user/pay', {
@@ -295,6 +317,24 @@ const TopUp = () => {
           if (payWay === 'stripe') {
             // Stripe 支付回调处理
             window.open(data.pay_link, '_blank');
+          } else if (payWay === 'alipay_official') {
+            // 支付宝官方支付
+            if (data?.pay_url) {
+              window.open(data.pay_url, '_blank');
+            } else {
+              showError(t('支付请求失败'));
+            }
+          } else if (payWay === 'wxpay_official') {
+            // 微信支付官方支付
+            if (data?.pay_url) {
+              if (data.pay_type === 'native') {
+                window.open(data.pay_url, '_blank');
+              } else {
+                window.location.href = data.pay_url;
+              }
+            } else {
+              showError(t('支付请求失败'));
+            }
           } else {
             // 普通支付表单提交
             let params = data;

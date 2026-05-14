@@ -222,6 +222,16 @@ export type BillingSettings = {
   StripeUnitPrice: number
   StripeMinTopUp: number
   StripePromotionCodesEnabled: boolean
+  AlipayAppId: string
+  AlipayPrivateKey: string
+  AlipayPublicKey: string
+  AlipayNotifyUrl: string
+  WxpayAppId: string
+  WxpayMchId: string
+  WxpayPrivateKey: string
+  WxpayApiV3Key: string
+  WxpayCertSerial: string
+  WxpayNotifyUrl: string
   CreemApiKey: string
   CreemWebhookSecret: string
   CreemTestMode: boolean

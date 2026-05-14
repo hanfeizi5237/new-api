@@ -39,6 +39,9 @@ const (
 	PaymentProviderWaffo        = "waffo"
 	PaymentProviderWaffoPancake = "waffo_pancake"
 	PaymentProviderQuota        = "quota"
+
+	PaymentProviderAlipay       = "alipay"
+	PaymentProviderWxpay        = "wxpay"
 )
 
 var (

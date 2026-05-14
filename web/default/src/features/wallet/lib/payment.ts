@@ -87,6 +87,20 @@ export function isWaffoPancakePayment(paymentType: string): boolean {
 }
 
 /**
+ * Check if payment method is Alipay official
+ */
+export function isAlipayPayment(paymentType: string): boolean {
+  return paymentType === 'alipay_official'
+}
+
+/**
+ * Check if payment method is WeChat Pay official
+ */
+export function isWxpayPayment(paymentType: string): boolean {
+  return paymentType === 'wxpay_official'
+}
+
+/**
  * Get default payment type from topup info
  */
 export function getDefaultPaymentType(topupInfo: TopupInfo | null): string {
