@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -72,6 +73,13 @@ func getTopUpStatusForPaymentGuardTest(t *testing.T, tradeNo string) string {
 	topUp := GetTopUpByTradeNo(tradeNo)
 	require.NotNil(t, topUp)
 	return topUp.Status
+}
+
+func getTopUpCompleteTimeForPaymentGuardTest(t *testing.T, tradeNo string) int64 {
+	t.Helper()
+	topUp := GetTopUpByTradeNo(tradeNo)
+	require.NotNil(t, topUp)
+	return topUp.CompleteTime
 }
 
 func countUserSubscriptionsForPaymentGuardTest(t *testing.T, userID int) int64 {
@@ -152,6 +160,99 @@ func TestUpdatePendingTopUpStatus_RejectsMismatchedPaymentProvider(t *testing.T)
 			assert.Equal(t, common.TopUpStatusPending, getTopUpStatusForPaymentGuardTest(t, tc.tradeNo))
 		})
 	}
+}
+
+func TestCompleteOfficialTopUp_SucceedsAtomicallyAndWritesCompleteTime(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForPaymentGuardTest(t, 701, 10)
+	insertTopUpForPaymentGuardTest(t, "official-success", 701, PaymentProviderAlipay)
+
+	result, err := CompleteOfficialTopUp("official-success", PaymentProviderAlipay, decimal.RequireFromString("9.99"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	expectedQuota := int(decimal.NewFromInt(2).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+	assert.Equal(t, common.TopUpStatusSuccess, getTopUpStatusForPaymentGuardTest(t, "official-success"))
+	assert.Greater(t, getTopUpCompleteTimeForPaymentGuardTest(t, "official-success"), int64(0))
+	assert.Equal(t, 10+expectedQuota, getUserQuotaForPaymentGuardTest(t, 701))
+	assert.Equal(t, expectedQuota, result.QuotaToAdd)
+	assert.False(t, result.AlreadyCompleted)
+}
+
+func TestCompleteOfficialTopUp_IsIdempotentForAlreadySuccessfulOrder(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForPaymentGuardTest(t, 702, 0)
+	insertTopUpForPaymentGuardTest(t, "official-idempotent", 702, PaymentProviderWxpay)
+
+	first, err := CompleteOfficialTopUp("official-idempotent", PaymentProviderWxpay, decimal.RequireFromString("9.99"))
+	require.NoError(t, err)
+	require.NotNil(t, first)
+
+	second, err := CompleteOfficialTopUp("official-idempotent", PaymentProviderWxpay, decimal.RequireFromString("9.99"))
+	require.NoError(t, err)
+	require.NotNil(t, second)
+
+	expectedQuota := int(decimal.NewFromInt(2).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+	assert.Equal(t, expectedQuota, getUserQuotaForPaymentGuardTest(t, 702))
+	assert.True(t, second.AlreadyCompleted)
+	assert.Zero(t, second.QuotaToAdd)
+}
+
+func TestCompleteOfficialTopUp_RejectsProviderAndAmountMismatch(t *testing.T) {
+	testCases := []struct {
+		name             string
+		tradeNo          string
+		storedProvider   string
+		expectedProvider string
+		paidAmount       decimal.Decimal
+		expectedError    error
+	}{
+		{
+			name:             "provider mismatch",
+			tradeNo:          "official-provider-mismatch",
+			storedProvider:   PaymentProviderAlipay,
+			expectedProvider: PaymentProviderWxpay,
+			paidAmount:       decimal.RequireFromString("9.99"),
+			expectedError:    ErrPaymentMethodMismatch,
+		},
+		{
+			name:             "amount mismatch",
+			tradeNo:          "official-amount-mismatch",
+			storedProvider:   PaymentProviderWxpay,
+			expectedProvider: PaymentProviderWxpay,
+			paidAmount:       decimal.RequireFromString("9.98"),
+			expectedError:    ErrTopUpAmountMismatch,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			truncateTables(t)
+			insertUserForPaymentGuardTest(t, 703, 0)
+			insertTopUpForPaymentGuardTest(t, tc.tradeNo, 703, tc.storedProvider)
+
+			result, err := CompleteOfficialTopUp(tc.tradeNo, tc.expectedProvider, tc.paidAmount)
+			require.ErrorIs(t, err, tc.expectedError)
+			assert.Nil(t, result)
+			assert.Equal(t, common.TopUpStatusPending, getTopUpStatusForPaymentGuardTest(t, tc.tradeNo))
+			assert.Zero(t, getTopUpCompleteTimeForPaymentGuardTest(t, tc.tradeNo))
+			assert.Equal(t, 0, getUserQuotaForPaymentGuardTest(t, 703))
+		})
+	}
+}
+
+func TestCompleteOfficialTopUp_RollsBackOrderWhenUserQuotaUpdateFails(t *testing.T) {
+	truncateTables(t)
+
+	insertTopUpForPaymentGuardTest(t, "official-rollback", 9999, PaymentProviderAlipay)
+
+	result, err := CompleteOfficialTopUp("official-rollback", PaymentProviderAlipay, decimal.RequireFromString("9.99"))
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Equal(t, common.TopUpStatusPending, getTopUpStatusForPaymentGuardTest(t, "official-rollback"))
+	assert.Zero(t, getTopUpCompleteTimeForPaymentGuardTest(t, "official-rollback"))
 }
 
 func TestCompleteSubscriptionOrder_RejectsMismatchedPaymentProvider(t *testing.T) {

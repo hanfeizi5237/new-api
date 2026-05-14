@@ -22,7 +22,7 @@ import {
   DEFAULT_PAYMENT_TYPE,
   DEFAULT_MIN_TOPUP,
 } from '../constants'
-import type { PresetAmount, TopupInfo } from '../types'
+import type { PaymentMethod, PresetAmount, TopupInfo } from '../types'
 
 // ============================================================================
 // Payment Processing Functions
@@ -90,14 +90,54 @@ export function isWaffoPancakePayment(paymentType: string): boolean {
  * Check if payment method is Alipay official
  */
 export function isAlipayPayment(paymentType: string): boolean {
-  return paymentType === 'alipay_official'
+  return paymentType === PAYMENT_TYPES.ALIPAY_OFFICIAL
 }
 
 /**
  * Check if payment method is WeChat Pay official
  */
 export function isWxpayPayment(paymentType: string): boolean {
-  return paymentType === 'wxpay_official'
+  return paymentType === PAYMENT_TYPES.WXPAY_OFFICIAL
+}
+
+/**
+ * Return only payment methods whose owning gateway is currently enabled.
+ */
+export function getAvailableTopupPaymentMethods(
+  topupInfo: TopupInfo | null
+): PaymentMethod[] {
+  if (!topupInfo?.pay_methods?.length) {
+    return []
+  }
+
+  return topupInfo.pay_methods.filter((method) => {
+    if (!method?.type) return false
+
+    if (method.type === PAYMENT_TYPES.STRIPE) {
+      return !!topupInfo.enable_stripe_topup
+    }
+
+    if (method.type === PAYMENT_TYPES.ALIPAY_OFFICIAL) {
+      return !!topupInfo.enable_alipay_topup
+    }
+
+    if (method.type === PAYMENT_TYPES.WXPAY_OFFICIAL) {
+      return !!topupInfo.enable_wxpay_topup
+    }
+
+    if (method.type === PAYMENT_TYPES.WAFFO_PANCAKE) {
+      return !!topupInfo.enable_waffo_pancake_topup
+    }
+
+    if (
+      method.type === PAYMENT_TYPES.CREEM ||
+      method.type === PAYMENT_TYPES.WAFFO
+    ) {
+      return false
+    }
+
+    return !!topupInfo.enable_online_topup
+  })
 }
 
 /**
@@ -108,13 +148,21 @@ export function getDefaultPaymentType(topupInfo: TopupInfo | null): string {
     return DEFAULT_PAYMENT_TYPE
   }
 
-  // Return first available payment method or default
-  if (topupInfo.pay_methods?.length > 0) {
-    return topupInfo.pay_methods[0].type
+  const availablePaymentMethods = getAvailableTopupPaymentMethods(topupInfo)
+  if (availablePaymentMethods.length > 0) {
+    return availablePaymentMethods[0].type
   }
 
   if (topupInfo.enable_stripe_topup) {
     return PAYMENT_TYPES.STRIPE
+  }
+
+  if (topupInfo.enable_alipay_topup) {
+    return PAYMENT_TYPES.ALIPAY_OFFICIAL
+  }
+
+  if (topupInfo.enable_wxpay_topup) {
+    return PAYMENT_TYPES.WXPAY_OFFICIAL
   }
 
   if (topupInfo.enable_waffo_topup) {
@@ -137,6 +185,10 @@ export function getMinTopupAmount(topupInfo: TopupInfo | null): number {
   }
 
   if (topupInfo.enable_online_topup) {
+    return topupInfo.min_topup
+  }
+
+  if (topupInfo.enable_alipay_topup || topupInfo.enable_wxpay_topup) {
     return topupInfo.min_topup
   }
 

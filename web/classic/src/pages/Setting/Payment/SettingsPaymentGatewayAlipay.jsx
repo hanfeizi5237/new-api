@@ -30,15 +30,17 @@ import { BookOpen } from 'lucide-react';
 
 export default function SettingsPaymentGatewayAlipay(props) {
   const { t } = useTranslation();
-  const sectionTitle = props.hideSectionTitle ? undefined : t('支付宝官方支付设置');
+  const sectionTitle = props.hideSectionTitle
+    ? undefined
+    : t('支付宝官方支付设置');
   const [loading, setLoading] = useState(false);
   const [inputs, setInputs] = useState({
     AlipayAppId: '',
     AlipayPrivateKey: '',
     AlipayPublicKey: '',
     AlipayNotifyUrl: '',
+    AlipayReturnUrl: '',
   });
-  const [originInputs, setOriginInputs] = useState({});
   const formApiRef = useRef(null);
 
   useEffect(() => {
@@ -48,9 +50,9 @@ export default function SettingsPaymentGatewayAlipay(props) {
         AlipayPrivateKey: props.options.AlipayPrivateKey || '',
         AlipayPublicKey: props.options.AlipayPublicKey || '',
         AlipayNotifyUrl: props.options.AlipayNotifyUrl || '',
+        AlipayReturnUrl: props.options.AlipayReturnUrl || '',
       };
       setInputs(currentInputs);
-      setOriginInputs({ ...currentInputs });
       formApiRef.current.setValues(currentInputs);
     }
   }, [props.options]);
@@ -67,20 +69,14 @@ export default function SettingsPaymentGatewayAlipay(props) {
 
     setLoading(true);
     try {
-      const options = [];
-
-      if (inputs.AlipayAppId !== '') {
-        options.push({ key: 'AlipayAppId', value: inputs.AlipayAppId });
-      }
-      if (inputs.AlipayPrivateKey && inputs.AlipayPrivateKey !== '') {
-        options.push({ key: 'AlipayPrivateKey', value: inputs.AlipayPrivateKey });
-      }
-      if (inputs.AlipayPublicKey && inputs.AlipayPublicKey !== '') {
-        options.push({ key: 'AlipayPublicKey', value: inputs.AlipayPublicKey });
-      }
-      if (inputs.AlipayNotifyUrl !== '') {
-        options.push({ key: 'AlipayNotifyUrl', value: inputs.AlipayNotifyUrl });
-      }
+      // 官方支付允许管理员主动清空字段，因此保存时必须提交空字符串。
+      const options = [
+        { key: 'AlipayAppId', value: inputs.AlipayAppId || '' },
+        { key: 'AlipayPrivateKey', value: inputs.AlipayPrivateKey || '' },
+        { key: 'AlipayPublicKey', value: inputs.AlipayPublicKey || '' },
+        { key: 'AlipayNotifyUrl', value: inputs.AlipayNotifyUrl || '' },
+        { key: 'AlipayReturnUrl', value: inputs.AlipayReturnUrl || '' },
+      ];
 
       // 发送请求
       const requestQueue = options.map((opt) =>
@@ -100,8 +96,6 @@ export default function SettingsPaymentGatewayAlipay(props) {
         });
       } else {
         showSuccess(t('更新成功'));
-        // 更新本地存储的原始值
-        setOriginInputs({ ...inputs });
         props.refresh?.();
       }
     } catch (error) {
@@ -151,6 +145,14 @@ export default function SettingsPaymentGatewayAlipay(props) {
                 extraText={t('可选，自定义异步通知回调地址')}
               />
             </Col>
+            <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+              <Form.Input
+                field='AlipayReturnUrl'
+                label={t('支付完成返回地址')}
+                placeholder={t('留空使用默认返回地址')}
+                extraText={t('可选，用户支付完成后的浏览器跳转地址')}
+              />
+            </Col>
           </Row>
           <Row
             gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
@@ -160,7 +162,7 @@ export default function SettingsPaymentGatewayAlipay(props) {
               <Form.TextArea
                 field='AlipayPrivateKey'
                 label={t('应用私钥')}
-                placeholder={t('粘贴支付宝应用私钥，留空表示保持当前不变')}
+                placeholder={t('粘贴支付宝应用私钥，留空将清空当前配置')}
                 extraText={t('RSA2 私钥，保存后不会回显')}
                 autosize={{ minRows: 3, maxRows: 5 }}
               />
@@ -169,7 +171,7 @@ export default function SettingsPaymentGatewayAlipay(props) {
               <Form.TextArea
                 field='AlipayPublicKey'
                 label={t('支付宝公钥')}
-                placeholder={t('粘贴支付宝公钥，留空表示保持当前不变')}
+                placeholder={t('粘贴支付宝公钥，留空将清空当前配置')}
                 extraText={t('用于验签，从支付宝开放平台获取，保存后不会回显')}
                 autosize={{ minRows: 3, maxRows: 5 }}
               />

@@ -6,8 +6,8 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net/url"
 	"sort"
@@ -184,6 +184,10 @@ func RequestAlipay(c *gin.Context) {
 		common.ApiErrorMsg(c, fmt.Sprintf("充值数量不能小于 %d", getMinTopup()))
 		return
 	}
+	if req.PaymentMethod != model.PaymentMethodAlipay {
+		common.ApiErrorMsg(c, "支付方式不存在")
+		return
+	}
 
 	id := c.GetInt("id")
 	group, err := model.GetUserGroup(id, true)
@@ -199,7 +203,7 @@ func RequestAlipay(c *gin.Context) {
 	}
 
 	// 检查支付宝配置
-	if operation_setting.AlipayAppId == "" || operation_setting.AlipayPrivateKey == "" {
+	if !isAlipayTopUpEnabled() {
 		common.ApiErrorMsg(c, "当前管理员未配置支付宝支付信息")
 		return
 	}
@@ -227,7 +231,12 @@ func RequestAlipay(c *gin.Context) {
 		bizContent["product_code"] = "QUICK_WAP_WAY"
 	}
 
-	bizContentJson, _ := json.Marshal(bizContent)
+	bizContentJson, err := common.Marshal(bizContent)
+	if err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("支付宝支付参数序列化失败 user_id=%d error=%q", id, err.Error()))
+		common.ApiErrorMsg(c, "创建支付参数失败")
+		return
+	}
 
 	params := getAlipayCommonParams()
 	if isMobile {
@@ -353,38 +362,38 @@ func AlipayNotify(c *gin.Context) {
 	tradeNo := params["out_trade_no"]
 
 	if tradeStatus == "TRADE_SUCCESS" || tradeStatus == "TRADE_FINISHED" {
-		LockOrder(tradeNo)
-		defer UnlockOrder(tradeNo)
-
-		topUp := model.GetTopUpByTradeNo(tradeNo)
-		if topUp == nil {
-			logger.LogWarn(c.Request.Context(), fmt.Sprintf("支付宝回调订单不存在 trade_no=%s", tradeNo))
-			c.Writer.Write([]byte("success"))
+		if tradeNo == "" {
+			logger.LogWarn(c.Request.Context(), "支付宝回调缺少商户订单号")
+			c.Writer.Write([]byte("fail"))
+			return
+		}
+		if strings.TrimSpace(params["app_id"]) != strings.TrimSpace(operation_setting.AlipayAppId) {
+			logger.LogWarn(c.Request.Context(), fmt.Sprintf("支付宝回调 app_id 不匹配 trade_no=%s app_id=%s", tradeNo, params["app_id"]))
+			c.Writer.Write([]byte("fail"))
+			return
+		}
+		paidAmount, err := decimal.NewFromString(params["total_amount"])
+		if err != nil || !paidAmount.IsPositive() {
+			logger.LogWarn(c.Request.Context(), fmt.Sprintf("支付宝回调金额无效 trade_no=%s total_amount=%s", tradeNo, params["total_amount"]))
+			c.Writer.Write([]byte("fail"))
 			return
 		}
 
-		if topUp.Status == common.TopUpStatusPending {
-			topUp.Status = common.TopUpStatusSuccess
-			err := topUp.Update()
-			if err != nil {
-				logger.LogError(c.Request.Context(), fmt.Sprintf("支付宝回调更新订单失败 trade_no=%s error=%q", tradeNo, err.Error()))
-				c.Writer.Write([]byte("fail"))
+		result, err := model.CompleteOfficialTopUp(tradeNo, model.PaymentProviderAlipay, paidAmount)
+		if err != nil {
+			if errors.Is(err, model.ErrTopUpNotFound) || errors.Is(err, model.ErrTopUpStatusInvalid) {
+				logger.LogWarn(c.Request.Context(), fmt.Sprintf("支付宝回调订单无需处理 trade_no=%s error=%q", tradeNo, err.Error()))
+				c.Writer.Write([]byte("success"))
 				return
 			}
+			logger.LogError(c.Request.Context(), fmt.Sprintf("支付宝回调完成充值失败 trade_no=%s error=%q", tradeNo, err.Error()))
+			c.Writer.Write([]byte("fail"))
+			return
+		}
 
-			// 更新用户额度
-			dAmount := decimal.NewFromInt(int64(topUp.Amount))
-			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
-			quotaToAdd := int(dAmount.Mul(dQuotaPerUnit).IntPart())
-			err = model.IncreaseUserQuota(topUp.UserId, quotaToAdd, true)
-			if err != nil {
-				logger.LogError(c.Request.Context(), fmt.Sprintf("支付宝回调更新用户额度失败 trade_no=%s user_id=%d error=%q", tradeNo, topUp.UserId, err.Error()))
-				c.Writer.Write([]byte("fail"))
-				return
-			}
-
-			logger.LogInfo(c.Request.Context(), fmt.Sprintf("支付宝充值成功 trade_no=%s user_id=%d quota_to_add=%d", tradeNo, topUp.UserId, quotaToAdd))
-			model.RecordTopupLog(topUp.UserId, fmt.Sprintf("使用支付宝充值成功，充值金额: %v，支付金额：%f", logger.LogQuota(quotaToAdd), topUp.Money), c.ClientIP(), topUp.PaymentMethod, "alipay")
+		if result != nil && !result.AlreadyCompleted && result.QuotaToAdd > 0 {
+			logger.LogInfo(c.Request.Context(), fmt.Sprintf("支付宝充值成功 trade_no=%s user_id=%d quota_to_add=%d", tradeNo, result.UserId, result.QuotaToAdd))
+			model.RecordTopupLog(result.UserId, fmt.Sprintf("使用支付宝充值成功，充值金额: %v，支付金额：%f", logger.LogQuota(result.QuotaToAdd), result.Money), c.ClientIP(), result.PaymentMethod, model.PaymentProviderAlipay)
 		}
 	}
 

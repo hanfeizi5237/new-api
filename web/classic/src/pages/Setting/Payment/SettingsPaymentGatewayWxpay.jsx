@@ -30,7 +30,9 @@ import { BookOpen } from 'lucide-react';
 
 export default function SettingsPaymentGatewayWxpay(props) {
   const { t } = useTranslation();
-  const sectionTitle = props.hideSectionTitle ? undefined : t('微信官方支付设置');
+  const sectionTitle = props.hideSectionTitle
+    ? undefined
+    : t('微信官方支付设置');
   const [loading, setLoading] = useState(false);
   const [inputs, setInputs] = useState({
     WxpayAppId: '',
@@ -39,8 +41,9 @@ export default function SettingsPaymentGatewayWxpay(props) {
     WxpayApiV3Key: '',
     WxpayCertSerial: '',
     WxpayNotifyUrl: '',
+    WxpayPublicKey: '',
+    WxpayPublicKeyId: '',
   });
-  const [originInputs, setOriginInputs] = useState({});
   const formApiRef = useRef(null);
 
   useEffect(() => {
@@ -52,9 +55,10 @@ export default function SettingsPaymentGatewayWxpay(props) {
         WxpayApiV3Key: props.options.WxpayApiV3Key || '',
         WxpayCertSerial: props.options.WxpayCertSerial || '',
         WxpayNotifyUrl: props.options.WxpayNotifyUrl || '',
+        WxpayPublicKey: props.options.WxpayPublicKey || '',
+        WxpayPublicKeyId: props.options.WxpayPublicKeyId || '',
       };
       setInputs(currentInputs);
-      setOriginInputs({ ...currentInputs });
       formApiRef.current.setValues(currentInputs);
     }
   }, [props.options]);
@@ -71,26 +75,17 @@ export default function SettingsPaymentGatewayWxpay(props) {
 
     setLoading(true);
     try {
-      const options = [];
-
-      if (inputs.WxpayAppId !== '') {
-        options.push({ key: 'WxpayAppId', value: inputs.WxpayAppId });
-      }
-      if (inputs.WxpayMchId !== '') {
-        options.push({ key: 'WxpayMchId', value: inputs.WxpayMchId });
-      }
-      if (inputs.WxpayPrivateKey && inputs.WxpayPrivateKey !== '') {
-        options.push({ key: 'WxpayPrivateKey', value: inputs.WxpayPrivateKey });
-      }
-      if (inputs.WxpayApiV3Key && inputs.WxpayApiV3Key !== '') {
-        options.push({ key: 'WxpayApiV3Key', value: inputs.WxpayApiV3Key });
-      }
-      if (inputs.WxpayCertSerial !== '') {
-        options.push({ key: 'WxpayCertSerial', value: inputs.WxpayCertSerial });
-      }
-      if (inputs.WxpayNotifyUrl !== '') {
-        options.push({ key: 'WxpayNotifyUrl', value: inputs.WxpayNotifyUrl });
-      }
+      // 官方支付允许管理员主动清空字段，因此保存时必须提交空字符串。
+      const options = [
+        { key: 'WxpayAppId', value: inputs.WxpayAppId || '' },
+        { key: 'WxpayMchId', value: inputs.WxpayMchId || '' },
+        { key: 'WxpayPrivateKey', value: inputs.WxpayPrivateKey || '' },
+        { key: 'WxpayApiV3Key', value: inputs.WxpayApiV3Key || '' },
+        { key: 'WxpayCertSerial', value: inputs.WxpayCertSerial || '' },
+        { key: 'WxpayNotifyUrl', value: inputs.WxpayNotifyUrl || '' },
+        { key: 'WxpayPublicKey', value: inputs.WxpayPublicKey || '' },
+        { key: 'WxpayPublicKeyId', value: inputs.WxpayPublicKeyId || '' },
+      ];
 
       // 发送请求
       const requestQueue = options.map((opt) =>
@@ -110,8 +105,6 @@ export default function SettingsPaymentGatewayWxpay(props) {
         });
       } else {
         showSuccess(t('更新成功'));
-        // 更新本地存储的原始值
-        setOriginInputs({ ...inputs });
         props.refresh?.();
       }
     } catch (error) {
@@ -178,7 +171,7 @@ export default function SettingsPaymentGatewayWxpay(props) {
               <Form.TextArea
                 field='WxpayPrivateKey'
                 label={t('商户私钥')}
-                placeholder={t('粘贴微信支付商户私钥，留空表示保持当前不变')}
+                placeholder={t('粘贴微信支付商户私钥，留空将清空当前配置')}
                 extraText={t('APIv3 私钥，保存后不会回显')}
                 autosize={{ minRows: 3, maxRows: 5 }}
               />
@@ -187,7 +180,7 @@ export default function SettingsPaymentGatewayWxpay(props) {
               <Form.TextArea
                 field='WxpayApiV3Key'
                 label={t('APIv3 密钥')}
-                placeholder={t('粘贴微信支付 APIv3 密钥，留空表示保持当前不变')}
+                placeholder={t('粘贴微信支付 APIv3 密钥，留空将清空当前配置')}
                 extraText={t('用于回调解密和验签，保存后不会回显')}
                 autosize={{ minRows: 3, maxRows: 5 }}
               />
@@ -203,6 +196,28 @@ export default function SettingsPaymentGatewayWxpay(props) {
                 label={t('异步通知地址')}
                 placeholder={t('留空使用默认回调地址')}
                 extraText={t('可选，自定义异步通知回调地址')}
+              />
+            </Col>
+            <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+              <Form.Input
+                field='WxpayPublicKeyId'
+                label={t('微信支付公钥 ID')}
+                placeholder={t('例如：PUB_KEY_ID_011423...')}
+                extraText={t('微信支付公钥模式的公钥 ID')}
+              />
+            </Col>
+          </Row>
+          <Row
+            gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+            style={{ marginTop: 16 }}
+          >
+            <Col xs={24} sm={24} md={24} lg={24} xl={24}>
+              <Form.TextArea
+                field='WxpayPublicKey'
+                label={t('微信支付公钥')}
+                placeholder={t('粘贴微信支付公钥，留空将清空当前配置')}
+                extraText={t('用于微信支付公钥模式验签，保存后不会回显')}
+                autosize={{ minRows: 3, maxRows: 5 }}
               />
             </Col>
           </Row>

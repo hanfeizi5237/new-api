@@ -68,6 +68,7 @@ const PaymentSetting = () => {
     AlipayPrivateKey: '',
     AlipayPublicKey: '',
     AlipayNotifyUrl: '',
+    AlipayReturnUrl: '',
 
     WxpayAppId: '',
     WxpayMchId: '',
@@ -75,6 +76,8 @@ const PaymentSetting = () => {
     WxpayApiV3Key: '',
     WxpayCertSerial: '',
     WxpayNotifyUrl: '',
+    WxpayPublicKey: '',
+    WxpayPublicKeyId: '',
   });
 
   let [loading, setLoading] = useState(false);

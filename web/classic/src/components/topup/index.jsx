@@ -61,6 +61,8 @@ const TopUp = () => {
   const [enableStripeTopUp, setEnableStripeTopUp] = useState(
     statusState?.status?.enable_stripe_topup || false,
   );
+  const [enableAlipayTopUp, setEnableAlipayTopUp] = useState(false);
+  const [enableWxpayTopUp, setEnableWxpayTopUp] = useState(false);
   const [enableQuotaPayForSubscription, setEnableQuotaPayForSubscription] =
     useState(false);
   const [statusLoading, setStatusLoading] = useState(true);
@@ -208,12 +210,12 @@ const TopUp = () => {
         return;
       }
     } else if (payment === 'alipay_official') {
-      if (!statusState?.status?.enable_alipay_topup) {
+      if (!enableAlipayTopUp) {
         showError(t('管理员未开启支付宝官方充值！'));
         return;
       }
     } else if (payment === 'wxpay_official') {
-      if (!statusState?.status?.enable_wxpay_topup) {
+      if (!enableWxpayTopUp) {
         showError(t('管理员未开启微信支付官方充值！'));
         return;
       }
@@ -676,6 +678,8 @@ const TopUp = () => {
           const enableStripeTopUp = data.enable_stripe_topup || false;
           const enableOnlineTopUp = data.enable_online_topup || false;
           const enableCreemTopUp = data.enable_creem_topup || false;
+          const enableAlipayTopUp = data.enable_alipay_topup || false;
+          const enableWxpayTopUp = data.enable_wxpay_topup || false;
           const enableWaffoTopUp = data.enable_waffo_topup || false;
           const enableWaffoPancakeTopUp =
             data.enable_waffo_pancake_topup || false;
@@ -691,6 +695,8 @@ const TopUp = () => {
           setEnableOnlineTopUp(enableOnlineTopUp);
           setEnableStripeTopUp(enableStripeTopUp);
           setEnableCreemTopUp(enableCreemTopUp);
+          setEnableAlipayTopUp(enableAlipayTopUp);
+          setEnableWxpayTopUp(enableWxpayTopUp);
           setEnableQuotaPayForSubscription(
             data.enable_quota_pay_for_subscription || false,
           );
@@ -990,6 +996,8 @@ const TopUp = () => {
           enableOnlineTopUp={enableOnlineTopUp}
           enableStripeTopUp={enableStripeTopUp}
           enableCreemTopUp={enableCreemTopUp}
+          enableAlipayTopUp={enableAlipayTopUp}
+          enableWxpayTopUp={enableWxpayTopUp}
           enableQuotaPayForSubscription={enableQuotaPayForSubscription}
           userQuota={userState?.user?.quota || 0}
           reloadUserSelf={getUserQuota}

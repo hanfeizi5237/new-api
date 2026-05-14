@@ -164,3 +164,56 @@ func TestEpayWebhookEnabledRequiresTopUpAndWebhookConfig(t *testing.T) {
 	operation_setting.PayMethods = nil
 	require.False(t, isEpayWebhookEnabled())
 }
+
+func TestAlipayTopUpEnabledRequiresCallbackVerificationConfig(t *testing.T) {
+	originalAppID := operation_setting.AlipayAppId
+	originalPrivateKey := operation_setting.AlipayPrivateKey
+	originalPublicKey := operation_setting.AlipayPublicKey
+	t.Cleanup(func() {
+		operation_setting.AlipayAppId = originalAppID
+		operation_setting.AlipayPrivateKey = originalPrivateKey
+		operation_setting.AlipayPublicKey = originalPublicKey
+	})
+
+	operation_setting.AlipayAppId = "app"
+	operation_setting.AlipayPrivateKey = "private"
+	operation_setting.AlipayPublicKey = ""
+	require.False(t, isAlipayTopUpEnabled())
+
+	operation_setting.AlipayPublicKey = "public"
+	require.True(t, isAlipayTopUpEnabled())
+}
+
+func TestWxpayTopUpEnabledRequiresCallbackVerificationConfig(t *testing.T) {
+	originalAppID := operation_setting.WxpayAppId
+	originalMchID := operation_setting.WxpayMchId
+	originalPrivateKey := operation_setting.WxpayPrivateKey
+	originalCertSerial := operation_setting.WxpayCertSerial
+	originalPublicKey := operation_setting.WxpayPublicKey
+	originalAPIv3Key := operation_setting.WxpayApiV3Key
+	t.Cleanup(func() {
+		operation_setting.WxpayAppId = originalAppID
+		operation_setting.WxpayMchId = originalMchID
+		operation_setting.WxpayPrivateKey = originalPrivateKey
+		operation_setting.WxpayCertSerial = originalCertSerial
+		operation_setting.WxpayPublicKey = originalPublicKey
+		operation_setting.WxpayApiV3Key = originalAPIv3Key
+	})
+
+	operation_setting.WxpayAppId = "app"
+	operation_setting.WxpayMchId = "mch"
+	operation_setting.WxpayPrivateKey = "private"
+	operation_setting.WxpayCertSerial = "serial"
+	operation_setting.WxpayPublicKey = "public"
+	operation_setting.WxpayApiV3Key = ""
+	require.False(t, isWxpayTopUpEnabled())
+
+	operation_setting.WxpayApiV3Key = "12345678901234567890123456789012"
+	require.True(t, isWxpayTopUpEnabled())
+}
+
+func TestYuanToFenUsesDecimalConversion(t *testing.T) {
+	require.Equal(t, int64(10), yuanToFen(0.1))
+	require.Equal(t, int64(30), yuanToFen(0.3))
+	require.Equal(t, int64(1001), yuanToFen(10.005))
+}

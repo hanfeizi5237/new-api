@@ -57,7 +57,17 @@ import type {
   PlanRecord,
   UserSubscriptionRecord,
 } from '@/features/subscriptions/types'
+import { PAYMENT_TYPES } from '../constants'
 import type { PaymentMethod, TopupInfo } from '../types'
+
+const NON_EPAY_SUBSCRIPTION_METHODS = new Set<string>([
+  PAYMENT_TYPES.STRIPE,
+  PAYMENT_TYPES.CREEM,
+  PAYMENT_TYPES.ALIPAY_OFFICIAL,
+  PAYMENT_TYPES.WXPAY_OFFICIAL,
+  PAYMENT_TYPES.WAFFO,
+  PAYMENT_TYPES.WAFFO_PANCAKE,
+])
 
 interface SubscriptionPlansCardProps {
   topupInfo: TopupInfo | null
@@ -70,7 +80,10 @@ interface SubscriptionPlansCardProps {
 
 function getEpayMethods(payMethods: PaymentMethod[] = []): PaymentMethod[] {
   return payMethods.filter(
-    (m) => m?.type && m.type !== 'stripe' && m.type !== 'creem'
+    (m) =>
+      m?.type &&
+      !NON_EPAY_SUBSCRIPTION_METHODS.has(m.type) &&
+      !m.type.startsWith('waffo:')
   )
 }
 

@@ -106,11 +106,15 @@ func isQuotaPayForSubscriptionEnabled() bool {
 
 func isAlipayTopUpEnabled() bool {
 	return strings.TrimSpace(operation_setting.AlipayAppId) != "" &&
-		strings.TrimSpace(operation_setting.AlipayPrivateKey) != ""
+		strings.TrimSpace(operation_setting.AlipayPrivateKey) != "" &&
+		strings.TrimSpace(operation_setting.AlipayPublicKey) != ""
 }
 
 func isWxpayTopUpEnabled() bool {
 	return strings.TrimSpace(operation_setting.WxpayAppId) != "" &&
 		strings.TrimSpace(operation_setting.WxpayMchId) != "" &&
-		strings.TrimSpace(operation_setting.WxpayPrivateKey) != ""
+		strings.TrimSpace(operation_setting.WxpayPrivateKey) != "" &&
+		strings.TrimSpace(operation_setting.WxpayCertSerial) != "" &&
+		strings.TrimSpace(operation_setting.WxpayPublicKey) != "" &&
+		strings.TrimSpace(operation_setting.WxpayApiV3Key) != ""
 }

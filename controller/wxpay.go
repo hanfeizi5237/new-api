@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
@@ -10,8 +11,8 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -102,7 +103,7 @@ func generateWxpaySignature(method, url string, body []byte, privateKeyStr strin
 	// RSA 签名
 	hasher := sha256.New()
 	hasher.Write([]byte(signContent))
-	signature, err := rsa.SignPKCS1v15(nil, privateKey.(*rsa.PrivateKey), 0, hasher.Sum(nil))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey.(*rsa.PrivateKey), crypto.SHA256, hasher.Sum(nil))
 	if err != nil {
 		return "", "", "", fmt.Errorf("failed to sign: %w", err)
 	}
@@ -119,7 +120,7 @@ func generateNonce() string {
 
 // yuanToFen 元转分
 func yuanToFen(yuan float64) int64 {
-	return int64(yuan * 100)
+	return decimal.NewFromFloat(yuan).Mul(decimal.NewFromInt(100)).Round(0).IntPart()
 }
 
 // RequestWxpay 创建微信支付订单
@@ -132,6 +133,10 @@ func RequestWxpay(c *gin.Context) {
 
 	if req.Amount < getMinTopup() {
 		common.ApiErrorMsg(c, fmt.Sprintf("充值数量不能小于 %d", getMinTopup()))
+		return
+	}
+	if req.PaymentMethod != model.PaymentMethodWxpay {
+		common.ApiErrorMsg(c, "支付方式不存在")
 		return
 	}
 
@@ -149,7 +154,7 @@ func RequestWxpay(c *gin.Context) {
 	}
 
 	// 检查微信支付配置
-	if operation_setting.WxpayAppId == "" || operation_setting.WxpayMchId == "" || operation_setting.WxpayPrivateKey == "" {
+	if !isWxpayTopUpEnabled() {
 		common.ApiErrorMsg(c, "当前管理员未配置微信支付信息")
 		return
 	}
@@ -172,24 +177,7 @@ func RequestWxpay(c *gin.Context) {
 		notifyUrl = operation_setting.WxpayNotifyUrl
 	}
 
-	var payUrl string
-	var payType string
-
-	if isMobile {
-		// H5 支付
-		payUrl, payType, err = createWxpayH5Order(tradeNo, payMoney, notifyUrl, c.ClientIP())
-	} else {
-		// Native 扫码支付
-		payUrl, payType, err = createWxpayNativeOrder(tradeNo, payMoney, notifyUrl)
-	}
-
-	if err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("微信支付订单创建失败 user_id=%d error=%q", id, err.Error()))
-		common.ApiErrorMsg(c, "创建支付订单失败")
-		return
-	}
-
-	// 创建充值订单
+	// 先创建本地充值订单，再请求微信下单，避免远端已创建但本地无订单导致回调无法入账。
 	amount := req.Amount
 	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
 		dAmount := decimal.NewFromInt(int64(amount))
@@ -209,6 +197,24 @@ func RequestWxpay(c *gin.Context) {
 	if err = topUp.Insert(); err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("微信充值订单创建失败 user_id=%d trade_no=%s error=%q", id, tradeNo, err.Error()))
 		common.ApiErrorMsg(c, "创建订单失败")
+		return
+	}
+
+	var payUrl string
+	var payType string
+
+	if isMobile {
+		// H5 支付
+		payUrl, payType, err = createWxpayH5Order(tradeNo, payMoney, notifyUrl, c.ClientIP())
+	} else {
+		// Native 扫码支付
+		payUrl, payType, err = createWxpayNativeOrder(tradeNo, payMoney, notifyUrl)
+	}
+
+	if err != nil {
+		_ = model.UpdatePendingTopUpStatus(tradeNo, model.PaymentProviderWxpay, common.TopUpStatusFailed)
+		logger.LogError(c.Request.Context(), fmt.Sprintf("微信支付订单创建失败 user_id=%d trade_no=%s error=%q", id, tradeNo, err.Error()))
+		common.ApiErrorMsg(c, "创建支付订单失败")
 		return
 	}
 
@@ -238,7 +244,10 @@ func createWxpayNativeOrder(tradeNo string, payMoney float64, notifyUrl string) 
 		},
 	}
 
-	bodyJson, _ := json.Marshal(body)
+	bodyJson, err := common.Marshal(body)
+	if err != nil {
+		return "", "", err
+	}
 
 	// 生成签名
 	sign, timestamp, nonce, err := generateWxpaySignature("POST", "/v3/pay/transactions/native", bodyJson, operation_setting.WxpayPrivateKey)
@@ -272,7 +281,7 @@ func createWxpayNativeOrder(tradeNo string, payMoney float64, notifyUrl string) 
 	}
 
 	var result WxpayNativeResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
+	if err := common.Unmarshal(respBody, &result); err != nil {
 		return "", "", err
 	}
 
@@ -305,7 +314,10 @@ func createWxpayH5Order(tradeNo string, payMoney float64, notifyUrl string, clie
 		},
 	}
 
-	bodyJson, _ := json.Marshal(body)
+	bodyJson, err := common.Marshal(body)
+	if err != nil {
+		return "", "", err
+	}
 
 	// 生成签名
 	sign, timestamp, nonce, err := generateWxpaySignature("POST", "/v3/pay/transactions/h5", bodyJson, operation_setting.WxpayPrivateKey)
@@ -339,7 +351,7 @@ func createWxpayH5Order(tradeNo string, payMoney float64, notifyUrl string, clie
 	}
 
 	var result WxpayH5Response
-	if err := json.Unmarshal(respBody, &result); err != nil {
+	if err := common.Unmarshal(respBody, &result); err != nil {
 		return "", "", err
 	}
 
@@ -394,7 +406,7 @@ func WxpayNotify(c *gin.Context) {
 		} `json:"resource"`
 	}
 
-	if err := json.Unmarshal(body, &payload); err != nil {
+	if err := common.Unmarshal(body, &payload); err != nil {
 		logger.LogWarn(c.Request.Context(), fmt.Sprintf("微信回调解析 JSON 失败 error=%q", err.Error()))
 		c.Writer.Write([]byte("fail"))
 		return
@@ -418,12 +430,14 @@ func WxpayNotify(c *gin.Context) {
 		TransactionID string `json:"transaction_id"`
 		OutTradeNo    string `json:"out_trade_no"`
 		TradeState    string `json:"trade_state"`
+		AppID         string `json:"appid"`
+		MchID         string `json:"mchid"`
 		Amount        struct {
 			Total int `json:"total"`
 		} `json:"amount"`
 	}
 
-	if err := json.Unmarshal(plaintext, &notifyData); err != nil {
+	if err := common.Unmarshal(plaintext, &notifyData); err != nil {
 		logger.LogWarn(c.Request.Context(), fmt.Sprintf("微信回调解析解密数据失败 error=%q", err.Error()))
 		c.Writer.Write([]byte("fail"))
 		return
@@ -431,38 +445,43 @@ func WxpayNotify(c *gin.Context) {
 
 	// 处理支付结果
 	if notifyData.TradeState == "SUCCESS" {
-		LockOrder(notifyData.OutTradeNo)
-		defer UnlockOrder(notifyData.OutTradeNo)
-
-		topUp := model.GetTopUpByTradeNo(notifyData.OutTradeNo)
-		if topUp == nil {
-			logger.LogWarn(c.Request.Context(), fmt.Sprintf("微信回调订单不存在 trade_no=%s", notifyData.OutTradeNo))
-			c.Writer.Write([]byte("success"))
+		if notifyData.OutTradeNo == "" {
+			logger.LogWarn(c.Request.Context(), "微信回调缺少商户订单号")
+			c.Writer.Write([]byte("fail"))
+			return
+		}
+		if strings.TrimSpace(notifyData.AppID) != strings.TrimSpace(operation_setting.WxpayAppId) {
+			logger.LogWarn(c.Request.Context(), fmt.Sprintf("微信回调 appid 不匹配 trade_no=%s appid=%s", notifyData.OutTradeNo, notifyData.AppID))
+			c.Writer.Write([]byte("fail"))
+			return
+		}
+		if strings.TrimSpace(notifyData.MchID) != strings.TrimSpace(operation_setting.WxpayMchId) {
+			logger.LogWarn(c.Request.Context(), fmt.Sprintf("微信回调 mchid 不匹配 trade_no=%s mchid=%s", notifyData.OutTradeNo, notifyData.MchID))
+			c.Writer.Write([]byte("fail"))
+			return
+		}
+		if notifyData.Amount.Total <= 0 {
+			logger.LogWarn(c.Request.Context(), fmt.Sprintf("微信回调金额无效 trade_no=%s total=%d", notifyData.OutTradeNo, notifyData.Amount.Total))
+			c.Writer.Write([]byte("fail"))
 			return
 		}
 
-		if topUp.Status == common.TopUpStatusPending {
-			topUp.Status = common.TopUpStatusSuccess
-			err := topUp.Update()
-			if err != nil {
-				logger.LogError(c.Request.Context(), fmt.Sprintf("微信回调更新订单失败 trade_no=%s error=%q", notifyData.OutTradeNo, err.Error()))
-				c.Writer.Write([]byte("fail"))
+		paidAmount := decimal.NewFromInt(int64(notifyData.Amount.Total)).Div(decimal.NewFromInt(100))
+		result, err := model.CompleteOfficialTopUp(notifyData.OutTradeNo, model.PaymentProviderWxpay, paidAmount)
+		if err != nil {
+			if errors.Is(err, model.ErrTopUpNotFound) || errors.Is(err, model.ErrTopUpStatusInvalid) {
+				logger.LogWarn(c.Request.Context(), fmt.Sprintf("微信回调订单无需处理 trade_no=%s error=%q", notifyData.OutTradeNo, err.Error()))
+				c.Writer.Write([]byte("success"))
 				return
 			}
+			logger.LogError(c.Request.Context(), fmt.Sprintf("微信回调完成充值失败 trade_no=%s error=%q", notifyData.OutTradeNo, err.Error()))
+			c.Writer.Write([]byte("fail"))
+			return
+		}
 
-			// 更新用户额度
-			dAmount := decimal.NewFromInt(int64(topUp.Amount))
-			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
-			quotaToAdd := int(dAmount.Mul(dQuotaPerUnit).IntPart())
-			err = model.IncreaseUserQuota(topUp.UserId, quotaToAdd, true)
-			if err != nil {
-				logger.LogError(c.Request.Context(), fmt.Sprintf("微信回调更新用户额度失败 trade_no=%s user_id=%d error=%q", notifyData.OutTradeNo, topUp.UserId, err.Error()))
-				c.Writer.Write([]byte("fail"))
-				return
-			}
-
-			logger.LogInfo(c.Request.Context(), fmt.Sprintf("微信充值成功 trade_no=%s user_id=%d quota_to_add=%d", notifyData.OutTradeNo, topUp.UserId, quotaToAdd))
-			model.RecordTopupLog(topUp.UserId, fmt.Sprintf("使用微信充值成功，充值金额: %v，支付金额：%f", logger.LogQuota(quotaToAdd), topUp.Money), c.ClientIP(), topUp.PaymentMethod, "wxpay")
+		if result != nil && !result.AlreadyCompleted && result.QuotaToAdd > 0 {
+			logger.LogInfo(c.Request.Context(), fmt.Sprintf("微信充值成功 trade_no=%s user_id=%d quota_to_add=%d", notifyData.OutTradeNo, result.UserId, result.QuotaToAdd))
+			model.RecordTopupLog(result.UserId, fmt.Sprintf("使用微信充值成功，充值金额: %v，支付金额：%f", logger.LogQuota(result.QuotaToAdd), result.Money), c.ClientIP(), result.PaymentMethod, model.PaymentProviderWxpay)
 		}
 	}
 
@@ -496,7 +515,7 @@ func verifyWxpayNotify(timestamp, nonce, body, serial, signature string) error {
 	// RSA 验签
 	hasher := sha256.New()
 	hasher.Write([]byte(signContent))
-	err = rsa.VerifyPKCS1v15(publicKey, 0, hasher.Sum(nil), signatureBytes)
+	err = rsa.VerifyPKCS1v15(publicKey, crypto.SHA256, hasher.Sum(nil), signatureBytes)
 	if err != nil {
 		return fmt.Errorf("signature verification failed: %w", err)
 	}

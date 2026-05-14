@@ -43,8 +43,16 @@ const { Text } = Typography;
 
 // 过滤易支付方式
 function getEpayMethods(payMethods = []) {
+  const nonEpayTypes = new Set([
+    'stripe',
+    'creem',
+    'alipay_official',
+    'wxpay_official',
+    'waffo',
+    'waffo_pancake',
+  ]);
   return (payMethods || []).filter(
-    (m) => m?.type && m.type !== 'stripe' && m.type !== 'creem',
+    (m) => m?.type && !nonEpayTypes.has(m.type) && !m.type.startsWith('waffo:'),
   );
 }
 

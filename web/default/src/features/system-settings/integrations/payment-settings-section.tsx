@@ -114,12 +114,15 @@ const paymentSchema = z.object({
   AlipayPrivateKey: z.string(),
   AlipayPublicKey: z.string(),
   AlipayNotifyUrl: z.string(),
+  AlipayReturnUrl: z.string(),
   WxpayAppId: z.string(),
   WxpayMchId: z.string(),
   WxpayPrivateKey: z.string(),
   WxpayApiV3Key: z.string(),
   WxpayCertSerial: z.string(),
   WxpayNotifyUrl: z.string(),
+  WxpayPublicKey: z.string(),
+  WxpayPublicKeyId: z.string(),
   CreemApiKey: z.string(),
   CreemWebhookSecret: z.string(),
   CreemTestMode: z.boolean(),
@@ -447,6 +450,7 @@ export function PaymentSettingsSection({
       AlipayPrivateKey: values.AlipayPrivateKey.trim(),
       AlipayPublicKey: values.AlipayPublicKey.trim(),
       AlipayNotifyUrl: removeTrailingSlash(values.AlipayNotifyUrl),
+      AlipayReturnUrl: removeTrailingSlash(values.AlipayReturnUrl),
     }
 
     const initial = {
@@ -454,6 +458,7 @@ export function PaymentSettingsSection({
       AlipayPrivateKey: initialRef.current.AlipayPrivateKey.trim(),
       AlipayPublicKey: initialRef.current.AlipayPublicKey.trim(),
       AlipayNotifyUrl: removeTrailingSlash(initialRef.current.AlipayNotifyUrl),
+      AlipayReturnUrl: removeTrailingSlash(initialRef.current.AlipayReturnUrl),
     }
 
     const updates: Array<{ key: string; value: string }> = []
@@ -489,6 +494,13 @@ export function PaymentSettingsSection({
       })
     }
 
+    if (sanitized.AlipayReturnUrl !== initial.AlipayReturnUrl) {
+      updates.push({
+        key: 'AlipayReturnUrl',
+        value: sanitized.AlipayReturnUrl,
+      })
+    }
+
     if (updates.length === 0) {
       return
     }
@@ -507,6 +519,8 @@ export function PaymentSettingsSection({
       WxpayApiV3Key: values.WxpayApiV3Key.trim(),
       WxpayCertSerial: values.WxpayCertSerial.trim(),
       WxpayNotifyUrl: removeTrailingSlash(values.WxpayNotifyUrl),
+      WxpayPublicKey: values.WxpayPublicKey.trim(),
+      WxpayPublicKeyId: values.WxpayPublicKeyId.trim(),
     }
 
     const initial = {
@@ -516,6 +530,8 @@ export function PaymentSettingsSection({
       WxpayApiV3Key: initialRef.current.WxpayApiV3Key.trim(),
       WxpayCertSerial: initialRef.current.WxpayCertSerial.trim(),
       WxpayNotifyUrl: removeTrailingSlash(initialRef.current.WxpayNotifyUrl),
+      WxpayPublicKey: initialRef.current.WxpayPublicKey.trim(),
+      WxpayPublicKeyId: initialRef.current.WxpayPublicKeyId.trim(),
     }
 
     const updates: Array<{ key: string; value: string }> = []
@@ -562,6 +578,20 @@ export function PaymentSettingsSection({
       })
     }
 
+    if (sanitized.WxpayPublicKey !== initial.WxpayPublicKey) {
+      updates.push({
+        key: 'WxpayPublicKey',
+        value: sanitized.WxpayPublicKey,
+      })
+    }
+
+    if (sanitized.WxpayPublicKeyId !== initial.WxpayPublicKeyId) {
+      updates.push({
+        key: 'WxpayPublicKeyId',
+        value: sanitized.WxpayPublicKeyId,
+      })
+    }
+
     if (updates.length === 0) {
       return
     }
@@ -593,12 +623,15 @@ export function PaymentSettingsSection({
       AlipayPrivateKey: values.AlipayPrivateKey.trim(),
       AlipayPublicKey: values.AlipayPublicKey.trim(),
       AlipayNotifyUrl: removeTrailingSlash(values.AlipayNotifyUrl),
+      AlipayReturnUrl: removeTrailingSlash(values.AlipayReturnUrl),
       WxpayAppId: values.WxpayAppId.trim(),
       WxpayMchId: values.WxpayMchId.trim(),
       WxpayPrivateKey: values.WxpayPrivateKey.trim(),
       WxpayApiV3Key: values.WxpayApiV3Key.trim(),
       WxpayCertSerial: values.WxpayCertSerial.trim(),
       WxpayNotifyUrl: removeTrailingSlash(values.WxpayNotifyUrl),
+      WxpayPublicKey: values.WxpayPublicKey.trim(),
+      WxpayPublicKeyId: values.WxpayPublicKeyId.trim(),
     }
 
     const initial = {
@@ -626,12 +659,15 @@ export function PaymentSettingsSection({
       AlipayPrivateKey: initialRef.current.AlipayPrivateKey.trim(),
       AlipayPublicKey: initialRef.current.AlipayPublicKey.trim(),
       AlipayNotifyUrl: removeTrailingSlash(initialRef.current.AlipayNotifyUrl),
+      AlipayReturnUrl: removeTrailingSlash(initialRef.current.AlipayReturnUrl),
       WxpayAppId: initialRef.current.WxpayAppId.trim(),
       WxpayMchId: initialRef.current.WxpayMchId.trim(),
       WxpayPrivateKey: initialRef.current.WxpayPrivateKey.trim(),
       WxpayApiV3Key: initialRef.current.WxpayApiV3Key.trim(),
       WxpayCertSerial: initialRef.current.WxpayCertSerial.trim(),
       WxpayNotifyUrl: removeTrailingSlash(initialRef.current.WxpayNotifyUrl),
+      WxpayPublicKey: initialRef.current.WxpayPublicKey.trim(),
+      WxpayPublicKeyId: initialRef.current.WxpayPublicKeyId.trim(),
     }
 
     const updates: Array<{ key: string; value: string | number | boolean }> = []
@@ -770,6 +806,13 @@ export function PaymentSettingsSection({
       })
     }
 
+    if (sanitized.AlipayReturnUrl !== initial.AlipayReturnUrl) {
+      updates.push({
+        key: 'AlipayReturnUrl',
+        value: sanitized.AlipayReturnUrl,
+      })
+    }
+
     if (sanitized.WxpayAppId !== initial.WxpayAppId) {
       updates.push({ key: 'WxpayAppId', value: sanitized.WxpayAppId })
     }
@@ -809,6 +852,20 @@ export function PaymentSettingsSection({
       updates.push({
         key: 'WxpayNotifyUrl',
         value: sanitized.WxpayNotifyUrl,
+      })
+    }
+
+    if (sanitized.WxpayPublicKey !== initial.WxpayPublicKey) {
+      updates.push({
+        key: 'WxpayPublicKey',
+        value: sanitized.WxpayPublicKey,
+      })
+    }
+
+    if (sanitized.WxpayPublicKeyId !== initial.WxpayPublicKeyId) {
+      updates.push({
+        key: 'WxpayPublicKeyId',
+        value: sanitized.WxpayPublicKeyId,
       })
     }
 
@@ -1606,7 +1663,7 @@ export function PaymentSettingsSection({
               </ul>
             </div>
 
-            <div className='grid gap-6 md:grid-cols-2'>
+            <div className='grid gap-6 md:grid-cols-3'>
               <FormField
                 control={form.control}
                 name='AlipayAppId'
@@ -1648,6 +1705,27 @@ export function PaymentSettingsSection({
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name='AlipayReturnUrl'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Return URL')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('Optional custom return URL')}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Leave blank to use default return URL')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             <div className='grid gap-6 md:grid-cols-2'>
@@ -1666,7 +1744,9 @@ export function PaymentSettingsSection({
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Application private key (leave blank unless updating)')}
+                      {t(
+                        'Application private key (leave blank unless updating)'
+                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -1682,7 +1762,9 @@ export function PaymentSettingsSection({
                     <FormControl>
                       <Textarea
                         rows={4}
-                        placeholder={t('Paste Alipay public key for verification')}
+                        placeholder={t(
+                          'Paste Alipay public key for verification'
+                        )}
                         {...field}
                         onChange={(event) => field.onChange(event.target.value)}
                       />
@@ -1734,7 +1816,7 @@ export function PaymentSettingsSection({
               </ul>
             </div>
 
-            <div className='grid gap-6 md:grid-cols-3'>
+            <div className='grid gap-6 md:grid-cols-4'>
               <FormField
                 control={form.control}
                 name='WxpayAppId'
@@ -1797,9 +1879,30 @@ export function PaymentSettingsSection({
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name='WxpayPublicKeyId'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Public Key ID')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('WeChat Pay public key ID')}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('WeChat Pay platform public key identifier')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
-            <div className='grid gap-6 md:grid-cols-2'>
+            <div className='grid gap-6 md:grid-cols-3'>
               <FormField
                 control={form.control}
                 name='WxpayPrivateKey'
@@ -1838,6 +1941,30 @@ export function PaymentSettingsSection({
                     </FormControl>
                     <FormDescription>
                       {t('For callback decryption and verification')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='WxpayPublicKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Public Key')}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={4}
+                        placeholder={t('Paste WeChat Pay public key')}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'WeChat Pay platform public key for signature verification'
+                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

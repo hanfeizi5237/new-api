@@ -57,6 +57,8 @@ const RechargeCard = ({
   enableOnlineTopUp,
   enableStripeTopUp,
   enableCreemTopUp,
+  enableAlipayTopUp,
+  enableWxpayTopUp,
   enableQuotaPayForSubscription = false,
   userQuota = 0,
   reloadUserSelf,
@@ -108,6 +110,7 @@ const RechargeCard = ({
   const shouldShowSubscription =
     !subscriptionLoading && subscriptionPlans.length > 0;
   const regularPayMethods = payMethods || [];
+  const hasOfficialTopUp = enableAlipayTopUp || enableWxpayTopUp;
 
   useEffect(() => {
     if (initialTabSetRef.current) return;
@@ -233,6 +236,7 @@ const RechargeCard = ({
         ) : enableOnlineTopUp ||
           enableStripeTopUp ||
           enableCreemTopUp ||
+          hasOfficialTopUp ||
           enableWaffoTopUp ||
           enableWaffoPancakeTopUp ? (
           <Form
@@ -242,6 +246,7 @@ const RechargeCard = ({
             <div className='space-y-6'>
               {(enableOnlineTopUp ||
                 enableStripeTopUp ||
+                hasOfficialTopUp ||
                 enableWaffoTopUp ||
                 enableWaffoPancakeTopUp) && (
                 <Row gutter={12}>
@@ -252,6 +257,7 @@ const RechargeCard = ({
                       disabled={
                         !enableOnlineTopUp &&
                         !enableStripeTopUp &&
+                        !hasOfficialTopUp &&
                         !enableWaffoTopUp &&
                         !enableWaffoPancakeTopUp
                       }
@@ -319,14 +325,24 @@ const RechargeCard = ({
                               payMethod.type.startsWith('waffo:');
                             const isWaffoPancake =
                               payMethod.type === 'waffo_pancake';
+                            const isAlipayOfficial =
+                              payMethod.type === 'alipay_official';
+                            const isWxpayOfficial =
+                              payMethod.type === 'wxpay_official';
+                            // 官方支付由 topup/info 的独立开关控制，不能被易支付总开关误禁用。
+                            const isOfficial =
+                              isAlipayOfficial || isWxpayOfficial;
                             const disabled =
                               (!enableOnlineTopUp &&
                                 !isStripe &&
                                 !isWaffo &&
-                                !isWaffoPancake) ||
+                                !isWaffoPancake &&
+                                !isOfficial) ||
                               (!enableStripeTopUp && isStripe) ||
                               (!enableWaffoTopUp && isWaffo) ||
                               (!enableWaffoPancakeTopUp && isWaffoPancake) ||
+                              (!enableAlipayTopUp && isAlipayOfficial) ||
+                              (!enableWxpayTopUp && isWxpayOfficial) ||
                               minTopupVal > Number(topUpCount || 0);
 
                             const buttonEl = (
@@ -342,7 +358,11 @@ const RechargeCard = ({
                                 icon={
                                   payMethod.type === 'alipay' ? (
                                     <SiAlipay size={18} color='#1677FF' />
+                                  ) : payMethod.type === 'alipay_official' ? (
+                                    <SiAlipay size={18} color='#1677FF' />
                                   ) : payMethod.type === 'wxpay' ? (
+                                    <SiWechat size={18} color='#07C160' />
+                                  ) : payMethod.type === 'wxpay_official' ? (
                                     <SiWechat size={18} color='#07C160' />
                                   ) : payMethod.type === 'stripe' ? (
                                     <SiStripe size={18} color='#635BFF' />
@@ -402,7 +422,10 @@ const RechargeCard = ({
                 </Row>
               )}
 
-              {(enableOnlineTopUp || enableStripeTopUp || enableWaffoTopUp) && (
+              {(enableOnlineTopUp ||
+                enableStripeTopUp ||
+                hasOfficialTopUp ||
+                enableWaffoTopUp) && (
                 <Form.Slot
                   label={
                     <div className='flex items-center gap-2'>

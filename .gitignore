@@ -37,3 +37,6 @@ skills-lock.json
 
 **/package-lock.json
 tmp/
+.codex/
+.github/
+.agents/

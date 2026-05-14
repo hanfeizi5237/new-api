@@ -226,12 +226,15 @@ export type BillingSettings = {
   AlipayPrivateKey: string
   AlipayPublicKey: string
   AlipayNotifyUrl: string
+  AlipayReturnUrl: string
   WxpayAppId: string
   WxpayMchId: string
   WxpayPrivateKey: string
   WxpayApiV3Key: string
   WxpayCertSerial: string
   WxpayNotifyUrl: string
+  WxpayPublicKey: string
+  WxpayPublicKeyId: string
   CreemApiKey: string
   CreemWebhookSecret: string
   CreemTestMode: boolean
