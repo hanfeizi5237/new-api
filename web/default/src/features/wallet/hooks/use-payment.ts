@@ -25,11 +25,15 @@ import {
   calculateWaffoPancakeAmount,
   requestPayment,
   requestStripePayment,
+  requestAlipayPayment,
+  requestWxpayPayment,
   isApiSuccess,
 } from '../api'
 import {
   isStripePayment,
   isWaffoPancakePayment,
+  isAlipayPayment,
+  isWxpayPayment,
   submitPaymentForm,
 } from '../lib'
 
@@ -82,32 +86,84 @@ export function usePayment() {
         setProcessing(true)
 
         const isStripe = isStripePayment(paymentType)
+        const isAlipay = isAlipayPayment(paymentType)
+        const isWxpay = isWxpayPayment(paymentType)
         const amount = Math.floor(topupAmount)
 
-        const response = isStripe
-          ? await requestStripePayment({
-              amount,
-              payment_method: 'stripe',
-            })
-          : await requestPayment({
-              amount,
-              payment_method: paymentType,
-            })
+        // Handle Stripe payment
+        if (isStripe) {
+          const response = await requestStripePayment({
+            amount,
+            payment_method: 'stripe',
+          })
+          if (!isApiSuccess(response)) {
+            toast.error(response.message || i18next.t('Payment request failed'))
+            return false
+          }
+          if (response.data?.pay_link) {
+            window.open(response.data.pay_link, '_blank')
+            toast.success(i18next.t('Redirecting to payment page...'))
+            return true
+          }
+          return false
+        }
+
+        // Handle Alipay official payment
+        if (isAlipay) {
+          const response = await requestAlipayPayment({
+            amount,
+            payment_method: paymentType,
+          })
+          if (!isApiSuccess(response)) {
+            toast.error(response.message || i18next.t('Payment request failed'))
+            return false
+          }
+          if (response.data?.pay_url) {
+            window.open(response.data.pay_url, '_blank')
+            toast.success(i18next.t('Redirecting to payment page...'))
+            return true
+          }
+          return false
+        }
+
+        // Handle WeChat Pay official payment
+        if (isWxpay) {
+          const response = await requestWxpayPayment({
+            amount,
+            payment_method: paymentType,
+          })
+          if (!isApiSuccess(response)) {
+            toast.error(response.message || i18next.t('Payment request failed'))
+            return false
+          }
+          if (response.data?.pay_url) {
+            const payUrl = response.data.pay_url
+            const payType = response.data.pay_type
+            if (payType === 'native') {
+              // For Native QR code payment, open URL
+              window.open(payUrl, '_blank')
+            } else {
+              // For H5 payment, redirect directly
+              window.location.href = payUrl
+            }
+            toast.success(i18next.t('Redirecting to payment page...'))
+            return true
+          }
+          return false
+        }
+
+        // Handle other payments (epay)
+        const response = await requestPayment({
+          amount,
+          payment_method: paymentType,
+        })
 
         if (!isApiSuccess(response)) {
           toast.error(response.message || i18next.t('Payment request failed'))
           return false
         }
 
-        // Handle Stripe payment
-        if (isStripe && response.data?.pay_link) {
-          window.open(response.data.pay_link as string, '_blank')
-          toast.success(i18next.t('Redirecting to payment page...'))
-          return true
-        }
-
-        // Handle non-Stripe payment
-        if (!isStripe && response.data) {
+        if (response.data) {
           const url = (response as unknown as { url?: string }).url
           if (url) {
             submitPaymentForm(url, response.data)

@@ -17,6 +17,23 @@ var Price = 7.3
 var MinTopUp = 1
 var USDExchangeRate = 7.3
 
+// Alipay official payment settings
+var AlipayAppId = ""
+var AlipayPrivateKey = ""
+var AlipayPublicKey = ""
+var AlipayNotifyUrl = ""
+var AlipayReturnUrl = ""
+
+// WeChat Pay official payment settings
+var WxpayAppId = ""
+var WxpayMchId = ""
+var WxpayPrivateKey = ""
+var WxpayApiV3Key = ""
+var WxpayCertSerial = ""
+var WxpayPublicKey = ""
+var WxpayPublicKeyId = ""
+var WxpayNotifyUrl = ""
+
 var PayMethods = []map[string]string{
 	{
 		"name":  "支付宝",

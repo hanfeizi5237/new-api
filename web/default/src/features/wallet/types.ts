@@ -55,6 +55,18 @@ export type WaffoPancakePaymentResponse = ApiResponse<
   | string
 >
 
+export type AlipayPaymentResponse = ApiResponse<{
+  pay_url: string
+  trade_no: string
+}>
+
+export type WxpayPaymentResponse = ApiResponse<{
+  pay_url: string
+  trade_no: string
+  pay_type: string
+  is_mobile: boolean
+}>
+
 /**
  * Creem product configuration
  */
