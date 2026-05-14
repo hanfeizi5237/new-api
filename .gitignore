@@ -37,3 +37,9 @@ skills-lock.json
 
 **/package-lock.json
 tmp/
+
+backups/
+.venv-migrate/
+migration/
+
+
