@@ -17,9 +17,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useState, useEffect } from 'react'
-import { Crown, CalendarClock, Package } from 'lucide-react'
+import { Crown, CalendarClock, Package, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useSystemConfig } from '@/hooks/use-system-config'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -42,6 +43,7 @@ import {
   paySubscriptionStripe,
   paySubscriptionCreem,
   paySubscriptionEpay,
+  paySubscriptionQuota,
 } from '../../api'
 import { formatDuration, formatResetPeriod } from '../../lib'
 import type { PlanRecord } from '../../types'
@@ -59,12 +61,19 @@ interface Props {
   enableCreem?: boolean
   enableOnlineTopUp?: boolean
   epayMethods?: PaymentMethod[]
+  /** Whether quota wallet payment for subscription is enabled (admin switch) */
+  enableQuotaPay?: boolean
+  /** Current user wallet quota balance */
+  userQuota?: number
   purchaseLimit?: number
   purchaseCount?: number
+  /** Called after a successful quota payment so caller can refresh subscription/quota */
+  onPaid?: () => void | Promise<void>
 }
 
 export function SubscriptionPurchaseDialog(props: Props) {
   const { t } = useTranslation()
+  const { currency } = useSystemConfig()
   const [paying, setPaying] = useState(false)
   const [selectedEpayMethod, setSelectedEpayMethod] = useState('')
 
@@ -83,7 +92,14 @@ export function SubscriptionPurchaseDialog(props: Props) {
   const hasCreem = props.enableCreem && !!plan.creem_product_id
   const hasEpay =
     props.enableOnlineTopUp && (props.epayMethods || []).length > 0
-  const hasAnyPayment = hasStripe || hasCreem || hasEpay
+  // Balance payment uses the live system quota ratio for UI checks; the backend still performs final validation.
+  const priceAmount = Number(plan.price_amount || 0)
+  const quotaPerUnit = Number(currency?.quotaPerUnit || 0)
+  const requiredQuota = Math.ceil(priceAmount * quotaPerUnit)
+  const userQuota = Number(props.userQuota ?? 0)
+  const quotaSufficient = userQuota >= requiredQuota
+  const hasQuotaPay = !!props.enableQuotaPay
+  const hasAnyPayment = hasStripe || hasCreem || hasEpay || hasQuotaPay
   const selectedEpayMethodLabel =
     (props.epayMethods || []).find((m) => m.type === selectedEpayMethod)
       ?.name ||
@@ -124,6 +140,28 @@ export function SubscriptionPurchaseDialog(props: Props) {
       if (res.message === 'success' && res.data?.checkout_url) {
         window.open(res.data.checkout_url, '_blank')
         toast.success(t('Payment page opened'))
+        props.onOpenChange(false)
+      } else {
+        toast.error(
+          res.message && res.message !== 'success'
+            ? res.message
+            : t('Payment request failed')
+        )
+      }
+    } catch {
+      toast.error(t('Payment request failed'))
+    } finally {
+      setPaying(false)
+    }
+  }
+
+  const handlePayQuota = async () => {
+    setPaying(true)
+    try {
+      const res = await paySubscriptionQuota({ plan_id: plan.id })
+      if (res.success || res.message === 'success') {
+        toast.success(t('Subscription purchased with wallet balance'))
+        await props.onPaid?.()
         props.onOpenChange(false)
       } else {
         toast.error(
@@ -284,6 +322,34 @@ export function SubscriptionPurchaseDialog(props: Props) {
                       Creem
                     </Button>
                   )}
+                </div>
+              )}
+              {hasQuotaPay && (
+                <div className='space-y-1.5'>
+                  <Button
+                    variant='outline'
+                    className='w-full justify-between'
+                    onClick={handlePayQuota}
+                    disabled={paying || limitReached || !quotaSufficient}
+                  >
+                    <span className='flex items-center gap-2'>
+                      <Wallet className='h-4 w-4' />
+                      {t('Pay with Wallet Balance')}
+                    </span>
+                    <span className='text-muted-foreground text-xs'>
+                      {quotaSufficient
+                        ? t('Balance: {{quota}}', { quota: userQuota })
+                        : t('Insufficient balance ({{quota}})', {
+                            quota: userQuota,
+                          })}
+                    </span>
+                  </Button>
+                  <p className='text-muted-foreground text-xs'>
+                    {t(
+                      'Requires {{quota}} quota. The server will re-check your balance before completing payment.',
+                      { quota: requiredQuota }
+                    )}
+                  </p>
                 </div>
               )}
               {hasEpay && (

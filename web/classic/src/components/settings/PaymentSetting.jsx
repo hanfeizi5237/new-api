@@ -42,6 +42,7 @@ const PaymentSetting = () => {
     PayMethods: '',
     AmountOptions: '',
     AmountDiscount: '',
+    EnableQuotaPayForSubscription: false,
 
     StripeApiSecret: '',
     StripeWebhookSecret: '',
@@ -121,6 +122,9 @@ const PaymentSetting = () => {
             newInputs[item.key] = item.value;
             break;
           case 'WaffoPancakeSandbox':
+            newInputs[item.key] = toBoolean(item.value);
+            break;
+          case 'EnableQuotaPayForSubscription':
             newInputs[item.key] = toBoolean(item.value);
             break;
           default:

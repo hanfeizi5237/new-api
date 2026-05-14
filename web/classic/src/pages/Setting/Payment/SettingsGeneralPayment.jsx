@@ -39,6 +39,7 @@ export default function SettingsGeneralPayment(props) {
     PayMethods: '',
     AmountOptions: '',
     AmountDiscount: '',
+    EnableQuotaPayForSubscription: false,
   });
   const [originInputs, setOriginInputs] = useState({});
   const formApiRef = useRef(null);
@@ -52,6 +53,8 @@ export default function SettingsGeneralPayment(props) {
         PayMethods: props.options.PayMethods || '',
         AmountOptions: props.options.AmountOptions || '',
         AmountDiscount: props.options.AmountDiscount || '',
+        EnableQuotaPayForSubscription:
+          props.options.EnableQuotaPayForSubscription === true,
       };
       setInputs(currentInputs);
       setOriginInputs({ ...currentInputs });
@@ -129,6 +132,15 @@ export default function SettingsGeneralPayment(props) {
         options.push({
           key: 'payment_setting.amount_discount',
           value: inputs.AmountDiscount,
+        });
+      }
+      if (
+        originInputs.EnableQuotaPayForSubscription !==
+        inputs.EnableQuotaPayForSubscription
+      ) {
+        options.push({
+          key: 'EnableQuotaPayForSubscription',
+          value: inputs.EnableQuotaPayForSubscription ? 'true' : 'false',
         });
       }
 
@@ -234,6 +246,20 @@ export default function SettingsGeneralPayment(props) {
                 autosize
                 extraText={t(
                   '设置不同充值金额对应的折扣，键为充值金额，值为折扣率，例如：{"100": 0.95, "200": 0.9, "500": 0.85}',
+                )}
+              />
+            </Col>
+          </Row>
+          <Row style={{ marginTop: 16 }}>
+            <Col span={24}>
+              <Form.Switch
+                field='EnableQuotaPayForSubscription'
+                size='default'
+                checkedText='｜'
+                uncheckedText='〇'
+                label={t('允许用户使用钱包余额购买订阅套餐')}
+                extraText={t(
+                  '开启后，用户可在购买订阅套餐时选择使用钱包余额支付。关闭时仅保留原有支付方式。',
                 )}
               />
             </Col>

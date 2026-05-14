@@ -98,3 +98,8 @@ func isEpayWebhookConfigured() bool {
 func isEpayWebhookEnabled() bool {
 	return isEpayTopUpEnabled()
 }
+
+// isQuotaPayForSubscriptionEnabled 判断是否允许使用钱包余额支付订阅套餐
+func isQuotaPayForSubscriptionEnabled() bool {
+	return setting.EnableQuotaPayForSubscription
+}

@@ -7,6 +7,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func insertUserForPaymentGuardTest(t *testing.T, id int, quota int) {
@@ -85,6 +86,20 @@ func getUserQuotaForPaymentGuardTest(t *testing.T, userID int) int {
 	var user User
 	require.NoError(t, DB.Select("quota").Where("id = ?", userID).First(&user).Error)
 	return user.Quota
+}
+
+func countSubscriptionOrdersForPaymentGuardTest(t *testing.T, userID int) int64 {
+	t.Helper()
+	var count int64
+	require.NoError(t, DB.Model(&SubscriptionOrder{}).Where("user_id = ?", userID).Count(&count).Error)
+	return count
+}
+
+func countTopUpsForPaymentGuardTest(t *testing.T, userID int) int64 {
+	t.Helper()
+	var count int64
+	require.NoError(t, DB.Model(&TopUp{}).Where("user_id = ?", userID).Count(&count).Error)
+	return count
 }
 
 func TestRechargeWaffoPancake_RejectsMismatchedPaymentMethod(t *testing.T) {
@@ -171,4 +186,96 @@ func TestExpireSubscriptionOrder_RejectsMismatchedPaymentProvider(t *testing.T) 
 	order := GetSubscriptionOrderByTradeNo("sub-expire-guard")
 	require.NotNil(t, order)
 	assert.Equal(t, common.TopUpStatusPending, order.Status)
+}
+
+func TestPaySubscriptionByQuota_SuccessCreatesAuditedOrderSubscriptionAndTopUp(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForPaymentGuardTest(t, 501, 1000)
+	plan := insertSubscriptionPlanForPaymentGuardTest(t, 601)
+
+	order, err := PaySubscriptionByQuota(501, plan, 333)
+	require.NoError(t, err)
+	require.NotNil(t, order)
+	assert.Equal(t, common.TopUpStatusSuccess, order.Status)
+	assert.Equal(t, PaymentMethodQuota, order.PaymentMethod)
+	assert.Equal(t, PaymentProviderQuota, order.PaymentProvider)
+	assert.Equal(t, 667, getUserQuotaForPaymentGuardTest(t, 501))
+	assert.Equal(t, int64(1), countSubscriptionOrdersForPaymentGuardTest(t, 501))
+	assert.Equal(t, int64(1), countUserSubscriptionsForPaymentGuardTest(t, 501))
+
+	topUp := GetTopUpByTradeNo(order.TradeNo)
+	require.NotNil(t, topUp)
+	assert.Equal(t, common.TopUpStatusSuccess, topUp.Status)
+	assert.Equal(t, PaymentMethodQuota, topUp.PaymentMethod)
+	assert.Equal(t, PaymentProviderQuota, topUp.PaymentProvider)
+	assert.Equal(t, plan.PriceAmount, topUp.Money)
+}
+
+func TestPaySubscriptionByQuota_InsufficientBalanceRollsBack(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForPaymentGuardTest(t, 502, 100)
+	plan := insertSubscriptionPlanForPaymentGuardTest(t, 602)
+
+	order, err := PaySubscriptionByQuota(502, plan, 101)
+	require.Error(t, err)
+	assert.Nil(t, order)
+	assert.Equal(t, 100, getUserQuotaForPaymentGuardTest(t, 502))
+	assert.Zero(t, countSubscriptionOrdersForPaymentGuardTest(t, 502))
+	assert.Zero(t, countUserSubscriptionsForPaymentGuardTest(t, 502))
+	assert.Zero(t, countTopUpsForPaymentGuardTest(t, 502))
+}
+
+func TestPaySubscriptionByQuota_MaxPurchaseRollsBackChargeAndOrder(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForPaymentGuardTest(t, 503, 1000)
+	plan := insertSubscriptionPlanForPaymentGuardTest(t, 603)
+	plan.MaxPurchasePerUser = 1
+	require.NoError(t, DB.Save(plan).Error)
+	require.NoError(t, DB.Create(&UserSubscription{
+		UserId:      503,
+		PlanId:      plan.Id,
+		AmountTotal: plan.TotalAmount,
+		EndTime:     time.Now().Add(time.Hour).Unix(),
+		Status:      "active",
+		Source:      "order",
+	}).Error)
+
+	order, err := PaySubscriptionByQuota(503, plan, 333)
+	require.Error(t, err)
+	assert.Nil(t, order)
+	assert.Equal(t, 1000, getUserQuotaForPaymentGuardTest(t, 503))
+	assert.Zero(t, countSubscriptionOrdersForPaymentGuardTest(t, 503))
+	assert.Equal(t, int64(1), countUserSubscriptionsForPaymentGuardTest(t, 503))
+	assert.Zero(t, countTopUpsForPaymentGuardTest(t, 503))
+}
+
+func TestUpsertSubscriptionTopUpTx_RejectsMismatchedPaymentProvider(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForPaymentGuardTest(t, 504, 0)
+	plan := insertSubscriptionPlanForPaymentGuardTest(t, 604)
+	insertTopUpForPaymentGuardTest(t, "sub-topup-provider-guard", 504, PaymentProviderStripe)
+	order := &SubscriptionOrder{
+		UserId:          504,
+		PlanId:          plan.Id,
+		Money:           plan.PriceAmount,
+		TradeNo:         "sub-topup-provider-guard",
+		PaymentMethod:   PaymentMethodQuota,
+		PaymentProvider: PaymentProviderQuota,
+		Status:          common.TopUpStatusSuccess,
+		CreateTime:      time.Now().Unix(),
+	}
+
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		return upsertSubscriptionTopUpTx(tx, order)
+	})
+	require.ErrorIs(t, err, ErrPaymentMethodMismatch)
+
+	topUp := GetTopUpByTradeNo("sub-topup-provider-guard")
+	require.NotNil(t, topUp)
+	assert.Equal(t, common.TopUpStatusPending, topUp.Status)
+	assert.Equal(t, PaymentProviderStripe, topUp.PaymentProvider)
 }

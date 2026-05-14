@@ -62,6 +62,10 @@ import type { PaymentMethod, TopupInfo } from '../types'
 interface SubscriptionPlansCardProps {
   topupInfo: TopupInfo | null
   onAvailabilityChange?: (available: boolean) => void
+  /** Current user wallet quota, used to enable quota-based subscription payment */
+  userQuota?: number
+  /** Refreshes wallet-level user data after balance-based subscription purchase */
+  onPaid?: () => void | Promise<void>
 }
 
 function getEpayMethods(payMethods: PaymentMethod[] = []): PaymentMethod[] {
@@ -91,6 +95,8 @@ function getBillingPreferenceLabel(
 export function SubscriptionPlansCard({
   topupInfo,
   onAvailabilityChange,
+  userQuota,
+  onPaid,
 }: SubscriptionPlansCardProps) {
   const { t } = useTranslation()
 
@@ -112,6 +118,7 @@ export function SubscriptionPlansCard({
   const enableStripe = !!topupInfo?.enable_stripe_topup
   const enableCreem = !!topupInfo?.enable_creem_topup
   const enableOnlineTopUp = !!topupInfo?.enable_online_topup
+  const enableQuotaPay = !!topupInfo?.enable_quota_pay_for_subscription
   const epayMethods = useMemo(
     () => getEpayMethods(topupInfo?.pay_methods),
     [topupInfo?.pay_methods]
@@ -631,6 +638,12 @@ export function SubscriptionPlansCard({
         enableCreem={enableCreem}
         enableOnlineTopUp={enableOnlineTopUp}
         epayMethods={epayMethods}
+        enableQuotaPay={enableQuotaPay}
+        userQuota={userQuota}
+        onPaid={async () => {
+          await fetchSelfSubscription()
+          await onPaid?.()
+        }}
         purchaseLimit={
           selectedPlan?.plan?.max_purchase_per_user
             ? Number(selectedPlan.plan.max_purchase_per_user)
