@@ -40,3 +40,9 @@ tmp/
 .codex/
 .github/
 .agents/
+
+backups/
+.venv-migrate/
+migration/
+
+
