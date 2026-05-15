@@ -57,6 +57,9 @@ const RechargeCard = ({
   enableOnlineTopUp,
   enableStripeTopUp,
   enableCreemTopUp,
+  enableQuotaPayForSubscription = false,
+  userQuota = 0,
+  reloadUserSelf,
   creemProducts,
   creemPreTopUp,
   presetAmounts,
@@ -664,11 +667,14 @@ const RechargeCard = ({
                 enableOnlineTopUp={enableOnlineTopUp}
                 enableStripeTopUp={enableStripeTopUp}
                 enableCreemTopUp={enableCreemTopUp}
+                enableQuotaPay={enableQuotaPayForSubscription}
+                userQuota={userQuota}
                 billingPreference={billingPreference}
                 onChangeBillingPreference={onChangeBillingPreference}
                 activeSubscriptions={activeSubscriptions}
                 allSubscriptions={allSubscriptions}
                 reloadSubscriptionSelf={reloadSubscriptionSelf}
+                reloadUserSelf={reloadUserSelf}
                 withCard={false}
               />
             </div>

@@ -165,6 +165,7 @@ func SetApiRouter(router *gin.Engine) {
 			subscriptionRoute.POST("/epay/pay", middleware.CriticalRateLimit(), controller.SubscriptionRequestEpay)
 			subscriptionRoute.POST("/stripe/pay", middleware.CriticalRateLimit(), controller.SubscriptionRequestStripePay)
 			subscriptionRoute.POST("/creem/pay", middleware.CriticalRateLimit(), controller.SubscriptionRequestCreemPay)
+			subscriptionRoute.POST("/quota/pay", middleware.CriticalRateLimit(), controller.SubscriptionRequestQuotaPay)
 		}
 		subscriptionAdminRoute := apiRouter.Group("/subscription/admin")
 		subscriptionAdminRoute.Use(middleware.AdminAuth())
@@ -396,6 +397,15 @@ func SetApiRouter(router *gin.Engine) {
 			deploymentsRoute.PUT("/:id/name", controller.UpdateDeploymentName)
 			deploymentsRoute.POST("/:id/extend", controller.ExtendDeployment)
 			deploymentsRoute.DELETE("/:id", controller.DeleteDeployment)
+		}
+		// User Usage Dashboard (admin only)
+		adminUsageRoute := apiRouter.Group("/admin/usage")
+		adminUsageRoute.Use(middleware.AdminAuth())
+		{
+			adminUsageRoute.GET("/overview", controller.GetUserUsageOverview)
+			adminUsageRoute.GET("/detail", controller.GetUserUsageDetail)
+			adminUsageRoute.GET("/timeseries", controller.GetGlobalTimeSeries)
+			adminUsageRoute.GET("/timeseries-by-model", controller.GetGlobalTimeSeriesByModel)
 		}
 	}
 }

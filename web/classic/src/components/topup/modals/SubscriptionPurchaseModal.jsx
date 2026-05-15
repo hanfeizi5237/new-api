@@ -28,10 +28,10 @@ import {
   Divider,
   Tooltip,
 } from '@douyinfe/semi-ui';
-import { Crown, CalendarClock, Package } from 'lucide-react';
+import { Crown, CalendarClock, Package, Wallet } from 'lucide-react';
 import { SiStripe } from 'react-icons/si';
 import { IconCreditCard } from '@douyinfe/semi-icons';
-import { renderQuota } from '../../../helpers';
+import { renderQuota, getQuotaPerUnit } from '../../../helpers';
 import { getCurrencyConfig } from '../../../helpers/render';
 import {
   formatSubscriptionDuration,
@@ -52,10 +52,13 @@ const SubscriptionPurchaseModal = ({
   enableOnlineTopUp = false,
   enableStripeTopUp = false,
   enableCreemTopUp = false,
+  enableQuotaPay = false,
+  userQuota = 0,
   purchaseLimitInfo = null,
   onPayStripe,
   onPayCreem,
   onPayEpay,
+  onPayQuota,
 }) => {
   const plan = selectedPlan?.plan;
   const totalAmount = Number(plan?.total_amount || 0);
@@ -65,11 +68,17 @@ const SubscriptionPurchaseModal = ({
   const displayPrice = convertedPrice.toFixed(
     Number.isInteger(convertedPrice) ? 0 : 2,
   );
+  // 余额支付所需的 quota 成本：按 PriceAmount × QuotaPerUnit 直接换算
+  const quotaPerUnit = getQuotaPerUnit();
+  const quotaCost = plan ? Math.ceil(price * quotaPerUnit) : 0;
+  const balanceQuota = Number(userQuota || 0);
+  const balanceEnough = balanceQuota >= quotaCost;
   // 只有当管理员开启支付网关 AND 套餐配置了对应的支付ID时才显示
   const hasStripe = enableStripeTopUp && !!plan?.stripe_price_id;
   const hasCreem = enableCreemTopUp && !!plan?.creem_product_id;
   const hasEpay = enableOnlineTopUp && epayMethods.length > 0;
-  const hasAnyPayment = hasStripe || hasCreem || hasEpay;
+  const hasQuota = enableQuotaPay && quotaCost > 0;
+  const hasAnyPayment = hasStripe || hasCreem || hasEpay || hasQuota;
   const purchaseLimit = Number(purchaseLimitInfo?.limit || 0);
   const purchaseCount = Number(purchaseLimitInfo?.count || 0);
   const purchaseLimitReached =
@@ -212,6 +221,30 @@ const SubscriptionPurchaseModal = ({
                       Creem
                     </Button>
                   )}
+                </div>
+              )}
+
+              {/* 钱包余额支付 */}
+              {hasQuota && (
+                <div className='flex flex-col gap-1'>
+                  <Button
+                    theme='light'
+                    type={balanceEnough ? 'primary' : 'tertiary'}
+                    icon={<Wallet size={14} />}
+                    onClick={onPayQuota}
+                    loading={paying}
+                    disabled={!balanceEnough || purchaseLimitReached}
+                    block
+                  >
+                    {t('使用钱包余额支付')}（{renderQuota(quotaCost)}）
+                  </Button>
+                  <Text
+                    size='small'
+                    type={balanceEnough ? 'tertiary' : 'danger'}
+                  >
+                    {t('当前余额')}：{renderQuota(balanceQuota)}
+                    {!balanceEnough && `，${t('余额不足')}`}
+                  </Text>
                 </div>
               )}
 

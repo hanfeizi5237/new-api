@@ -132,6 +132,22 @@ export async function paySubscriptionEpay(
   }
 }
 
+export interface SubscriptionQuotaPayResult {
+  success?: boolean
+  message?: string
+  data?: {
+    trade_no?: string
+    quota_cost?: number
+  }
+}
+
+export async function paySubscriptionQuota(
+  data: SubscriptionPayRequest
+): Promise<SubscriptionQuotaPayResult> {
+  const res = await api.post('/api/subscription/quota/pay', data)
+  return res.data
+}
+
 // ============================================================================
 // User Self Subscriptions
 // ============================================================================

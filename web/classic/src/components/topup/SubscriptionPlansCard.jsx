@@ -77,11 +77,14 @@ const SubscriptionPlansCard = ({
   enableOnlineTopUp = false,
   enableStripeTopUp = false,
   enableCreemTopUp = false,
+  enableQuotaPay = false,
+  userQuota = 0,
   billingPreference,
   onChangeBillingPreference,
   activeSubscriptions = [],
   allSubscriptions = [],
   reloadSubscriptionSelf,
+  reloadUserSelf,
   withCard = true,
 }) => {
   const [open, setOpen] = useState(false);
@@ -184,6 +187,38 @@ const SubscriptionPlansCard = ({
         submitEpayForm({ url: res.data.url, params: res.data.data });
         showSuccess(t('已发起支付'));
         closeBuy();
+      } else {
+        const errorMsg =
+          typeof res.data?.data === 'string'
+            ? res.data.data
+            : res.data?.message || t('支付失败');
+        showError(errorMsg);
+      }
+    } catch (e) {
+      showError(t('支付请求失败'));
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const payQuota = async () => {
+    if (!selectedPlan?.plan?.id) {
+      showError(t('未选中套餐'));
+      return;
+    }
+    setPaying(true);
+    try {
+      const res = await API.post('/api/subscription/quota/pay', {
+        plan_id: selectedPlan.plan.id,
+      });
+      if (res.data?.success) {
+        showSuccess(t('已使用钱包余额完成订阅购买'));
+        closeBuy();
+        try {
+          await Promise.all([reloadSubscriptionSelf?.(), reloadUserSelf?.()]);
+        } catch (e) {
+          // 刷新失败不阻断主流程
+        }
       } else {
         const errorMsg =
           typeof res.data?.data === 'string'
@@ -673,6 +708,8 @@ const SubscriptionPlansCard = ({
         enableOnlineTopUp={enableOnlineTopUp}
         enableStripeTopUp={enableStripeTopUp}
         enableCreemTopUp={enableCreemTopUp}
+        enableQuotaPay={enableQuotaPay}
+        userQuota={userQuota}
         purchaseLimitInfo={
           selectedPlan?.plan?.id
             ? {
@@ -684,6 +721,7 @@ const SubscriptionPlansCard = ({
         onPayStripe={payStripe}
         onPayCreem={payCreem}
         onPayEpay={payEpay}
+        onPayQuota={payQuota}
       />
     </>
   );

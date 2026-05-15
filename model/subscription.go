@@ -456,7 +456,7 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 			return nil, errors.New("已达到该套餐购买上限")
 		}
 	}
-	nowUnix := GetDBTimestamp()
+	nowUnix := getDBTimestampTx(tx)
 	now := time.Unix(nowUnix, 0)
 	endUnix, err := calcPlanEndTime(now, plan)
 	if err != nil {
@@ -535,7 +535,7 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 		if order.Status != common.TopUpStatusPending {
 			return ErrSubscriptionOrderStatusInvalid
 		}
-		plan, err := GetSubscriptionPlanById(order.PlanId)
+		plan, err := getSubscriptionPlanByIdTx(tx, order.PlanId)
 		if err != nil {
 			return err
 		}
@@ -584,19 +584,24 @@ func upsertSubscriptionTopUpTx(tx *gorm.DB, order *SubscriptionOrder) error {
 	if tx == nil || order == nil {
 		return errors.New("invalid subscription order")
 	}
+	if strings.TrimSpace(order.PaymentProvider) == "" {
+		return errors.New("subscription order payment provider is empty")
+	}
 	now := common.GetTimestamp()
 	var topup TopUp
 	if err := tx.Where("trade_no = ?", order.TradeNo).First(&topup).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 订阅订单同步写入充值流水时保留支付网关来源，便于后续审计和回调守卫。
 			topup = TopUp{
-				UserId:        order.UserId,
-				Amount:        0,
-				Money:         order.Money,
-				TradeNo:       order.TradeNo,
-				PaymentMethod: order.PaymentMethod,
-				CreateTime:    order.CreateTime,
-				CompleteTime:  now,
-				Status:        common.TopUpStatusSuccess,
+				UserId:          order.UserId,
+				Amount:          0,
+				Money:           order.Money,
+				TradeNo:         order.TradeNo,
+				PaymentMethod:   order.PaymentMethod,
+				PaymentProvider: order.PaymentProvider,
+				CreateTime:      order.CreateTime,
+				CompleteTime:    now,
+				Status:          common.TopUpStatusSuccess,
 			}
 			return tx.Create(&topup).Error
 		}
@@ -608,12 +613,97 @@ func upsertSubscriptionTopUpTx(tx *gorm.DB, order *SubscriptionOrder) error {
 	} else if topup.PaymentMethod != order.PaymentMethod {
 		return ErrPaymentMethodMismatch
 	}
+	if topup.PaymentProvider == "" {
+		topup.PaymentProvider = order.PaymentProvider
+	} else if topup.PaymentProvider != order.PaymentProvider {
+		return ErrPaymentMethodMismatch
+	}
 	if topup.CreateTime == 0 {
 		topup.CreateTime = order.CreateTime
 	}
 	topup.CompleteTime = now
 	topup.Status = common.TopUpStatusSuccess
 	return tx.Save(&topup).Error
+}
+
+// PaySubscriptionByQuota 使用钱包余额(quota)即时支付订阅套餐。
+// 整个流程在单个数据库事务内完成：
+//  1. 扣减用户余额（要求 quota >= quotaCost，否则失败回滚）
+//  2. 写入 SubscriptionOrder 并直接标记为 Success
+//  3. 创建 UserSubscription（受 plan.MaxPurchasePerUser 校验）
+//  4. 写入 TopUp 流水
+//
+// 任何一步失败都会回滚，调用方无需做补偿。
+// 事务提交成功后异步同步 quota 缓存与升级分组缓存，并写日志。
+func PaySubscriptionByQuota(userId int, plan *SubscriptionPlan, quotaCost int) (*SubscriptionOrder, error) {
+	if userId <= 0 {
+		return nil, errors.New("invalid user id")
+	}
+	if plan == nil || plan.Id == 0 {
+		return nil, errors.New("invalid plan")
+	}
+	if quotaCost <= 0 {
+		return nil, errors.New("invalid quota cost")
+	}
+
+	tradeNo := fmt.Sprintf("SUBUSR%dNO%s%d", userId, common.GetRandomString(6), time.Now().UnixNano())
+	now := common.GetTimestamp()
+	order := &SubscriptionOrder{
+		UserId:          userId,
+		PlanId:          plan.Id,
+		Money:           plan.PriceAmount,
+		TradeNo:         tradeNo,
+		PaymentMethod:   PaymentMethodQuota,
+		PaymentProvider: PaymentProviderQuota,
+		Status:          common.TopUpStatusSuccess,
+		CreateTime:      now,
+		CompleteTime:    now,
+	}
+
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		// 1. 原子扣减余额
+		res := tx.Model(&User{}).
+			Where("id = ? AND quota >= ?", userId, quotaCost).
+			Update("quota", gorm.Expr("quota - ?", quotaCost))
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return errors.New("钱包余额不足")
+		}
+
+		// 2. 创建订单（已为 Success 状态）
+		if err := tx.Create(order).Error; err != nil {
+			return err
+		}
+
+		// 3. 创建用户订阅（内部会校验 MaxPurchasePerUser）
+		if _, err := CreateUserSubscriptionFromPlanTx(tx, userId, plan, "order"); err != nil {
+			return err
+		}
+
+		// 4. 写入 TopUp 流水
+		if err := upsertSubscriptionTopUpTx(tx, order); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// 事务外：同步 quota 缓存（订阅购买是低频操作，不走异步）
+	if cerr := cacheDecrUserQuota(userId, int64(quotaCost)); cerr != nil {
+		common.SysLog("failed to sync user quota cache after subscription quota pay: " + cerr.Error())
+	}
+	if upgradeGroup := strings.TrimSpace(plan.UpgradeGroup); upgradeGroup != "" {
+		_ = UpdateUserGroupCache(userId, upgradeGroup)
+	}
+
+	msg := fmt.Sprintf("订阅购买成功（钱包余额支付），套餐: %s，扣减额度: %d，等值金额: %.2f USD", plan.Title, quotaCost, plan.PriceAmount)
+	RecordLog(userId, LogTypeTopup, msg)
+	return order, nil
 }
 
 func ExpireSubscriptionOrder(tradeNo string, expectedPaymentProvider string) error {
@@ -1088,7 +1178,7 @@ func RefundSubscriptionPreConsume(requestId string) error {
 			record.Status = "refunded"
 			return tx.Save(&record).Error
 		}
-		if err := PostConsumeUserSubscriptionDelta(record.UserSubscriptionId, -record.PreConsumed); err != nil {
+		if err := postConsumeUserSubscriptionDeltaTx(tx, record.UserSubscriptionId, -record.PreConsumed); err != nil {
 			return err
 		}
 		record.Status = "refunded"
@@ -1187,20 +1277,27 @@ func PostConsumeUserSubscriptionDelta(userSubscriptionId int, delta int64) error
 		return nil
 	}
 	return DB.Transaction(func(tx *gorm.DB) error {
-		var sub UserSubscription
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").
-			Where("id = ?", userSubscriptionId).
-			First(&sub).Error; err != nil {
-			return err
-		}
-		newUsed := sub.AmountUsed + delta
-		if newUsed < 0 {
-			newUsed = 0
-		}
-		if sub.AmountTotal > 0 && newUsed > sub.AmountTotal {
-			return fmt.Errorf("subscription used exceeds total, used=%d total=%d", newUsed, sub.AmountTotal)
-		}
-		sub.AmountUsed = newUsed
-		return tx.Save(&sub).Error
+		return postConsumeUserSubscriptionDeltaTx(tx, userSubscriptionId, delta)
 	})
+}
+
+func postConsumeUserSubscriptionDeltaTx(tx *gorm.DB, userSubscriptionId int, delta int64) error {
+	if tx == nil {
+		return errors.New("tx is nil")
+	}
+	var sub UserSubscription
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		Where("id = ?", userSubscriptionId).
+		First(&sub).Error; err != nil {
+		return err
+	}
+	newUsed := sub.AmountUsed + delta
+	if newUsed < 0 {
+		newUsed = 0
+	}
+	if sub.AmountTotal > 0 && newUsed > sub.AmountTotal {
+		return fmt.Errorf("subscription used exceeds total, used=%d total=%d", newUsed, sub.AmountTotal)
+	}
+	sub.AmountUsed = newUsed
+	return tx.Save(&sub).Error
 }

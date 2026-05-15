@@ -157,6 +157,8 @@ export interface TopupInfo {
   enable_waffo_pancake_topup?: boolean
   /** Minimum topup amount for Waffo Pancake */
   waffo_pancake_min_topup?: number
+  /** Whether quota wallet payment for subscription is enabled (admin switch) */
+  enable_quota_pay_for_subscription?: boolean
 }
 
 /**
