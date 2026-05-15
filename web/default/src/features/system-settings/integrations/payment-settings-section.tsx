@@ -467,20 +467,14 @@ export function PaymentSettingsSection({
       updates.push({ key: 'AlipayAppId', value: sanitized.AlipayAppId })
     }
 
-    if (
-      sanitized.AlipayPrivateKey &&
-      sanitized.AlipayPrivateKey !== initial.AlipayPrivateKey
-    ) {
+    if (sanitized.AlipayPrivateKey !== initial.AlipayPrivateKey) {
       updates.push({
         key: 'AlipayPrivateKey',
         value: sanitized.AlipayPrivateKey,
       })
     }
 
-    if (
-      sanitized.AlipayPublicKey &&
-      sanitized.AlipayPublicKey !== initial.AlipayPublicKey
-    ) {
+    if (sanitized.AlipayPublicKey !== initial.AlipayPublicKey) {
       updates.push({
         key: 'AlipayPublicKey',
         value: sanitized.AlipayPublicKey,
@@ -544,20 +538,14 @@ export function PaymentSettingsSection({
       updates.push({ key: 'WxpayMchId', value: sanitized.WxpayMchId })
     }
 
-    if (
-      sanitized.WxpayPrivateKey &&
-      sanitized.WxpayPrivateKey !== initial.WxpayPrivateKey
-    ) {
+    if (sanitized.WxpayPrivateKey !== initial.WxpayPrivateKey) {
       updates.push({
         key: 'WxpayPrivateKey',
         value: sanitized.WxpayPrivateKey,
       })
     }
 
-    if (
-      sanitized.WxpayApiV3Key &&
-      sanitized.WxpayApiV3Key !== initial.WxpayApiV3Key
-    ) {
+    if (sanitized.WxpayApiV3Key !== initial.WxpayApiV3Key) {
       updates.push({
         key: 'WxpayApiV3Key',
         value: sanitized.WxpayApiV3Key,
@@ -779,20 +767,14 @@ export function PaymentSettingsSection({
       updates.push({ key: 'AlipayAppId', value: sanitized.AlipayAppId })
     }
 
-    if (
-      sanitized.AlipayPrivateKey &&
-      sanitized.AlipayPrivateKey !== initial.AlipayPrivateKey
-    ) {
+    if (sanitized.AlipayPrivateKey !== initial.AlipayPrivateKey) {
       updates.push({
         key: 'AlipayPrivateKey',
         value: sanitized.AlipayPrivateKey,
       })
     }
 
-    if (
-      sanitized.AlipayPublicKey &&
-      sanitized.AlipayPublicKey !== initial.AlipayPublicKey
-    ) {
+    if (sanitized.AlipayPublicKey !== initial.AlipayPublicKey) {
       updates.push({
         key: 'AlipayPublicKey',
         value: sanitized.AlipayPublicKey,
@@ -821,20 +803,14 @@ export function PaymentSettingsSection({
       updates.push({ key: 'WxpayMchId', value: sanitized.WxpayMchId })
     }
 
-    if (
-      sanitized.WxpayPrivateKey &&
-      sanitized.WxpayPrivateKey !== initial.WxpayPrivateKey
-    ) {
+    if (sanitized.WxpayPrivateKey !== initial.WxpayPrivateKey) {
       updates.push({
         key: 'WxpayPrivateKey',
         value: sanitized.WxpayPrivateKey,
       })
     }
 
-    if (
-      sanitized.WxpayApiV3Key &&
-      sanitized.WxpayApiV3Key !== initial.WxpayApiV3Key
-    ) {
+    if (sanitized.WxpayApiV3Key !== initial.WxpayApiV3Key) {
       updates.push({
         key: 'WxpayApiV3Key',
         value: sanitized.WxpayApiV3Key,
