@@ -23,19 +23,31 @@ import pkg from '@douyinfe/vite-plugin-semi';
 import path from 'path';
 import { codeInspectorPlugin } from 'code-inspector-plugin';
 const { vitePluginSemi } = pkg;
+const semiCssSpecifier = '@douyinfe/semi-ui/dist/css/semi.css';
+const semiCssPath = path.resolve(
+  __dirname,
+  './node_modules/@douyinfe/semi-ui/dist/css/semi.css',
+);
 
 // https://vitejs.dev/config/
 export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@douyinfe/semi-ui/dist/css/semi.css': path.resolve(
-        __dirname,
-        './node_modules/@douyinfe/semi-ui/dist/css/semi.css',
-      ),
+      [semiCssSpecifier]: semiCssPath,
     },
   },
   plugins: [
+    {
+      name: 'semi-ui-css-exports-fallback',
+      enforce: 'pre',
+      resolveId(id) {
+        if (id === semiCssSpecifier) {
+          return semiCssPath;
+        }
+        return null;
+      },
+    },
     codeInspectorPlugin({
       bundler: 'vite',
     }),

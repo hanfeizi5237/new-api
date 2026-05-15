@@ -80,6 +80,7 @@ import {
   Package,
   Server,
   CalendarClock,
+  Linkedin as LinkedinIcon,
 } from 'lucide-react';
 import {
   SiAtlassian,
