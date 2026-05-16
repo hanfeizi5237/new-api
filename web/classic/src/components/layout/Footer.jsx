@@ -63,25 +63,19 @@ const FooterBar = () => {
                 </p>
                 <div className='flex flex-col gap-4'>
                   <a
-                    href='https://docs.newapi.pro/wiki/project-introduction/'
-                    target='_blank'
-                    rel='noopener noreferrer'
+                    href='/docs'
                     className='!text-semi-color-text-1'
                   >
                     {t('关于项目')}
                   </a>
                   <a
-                    href='https://docs.newapi.pro/support/community-interaction/'
-                    target='_blank'
-                    rel='noopener noreferrer'
+                    href='/docs'
                     className='!text-semi-color-text-1'
                   >
                     {t('联系我们')}
                   </a>
                   <a
-                    href='https://docs.newapi.pro/wiki/features-introduction/'
-                    target='_blank'
-                    rel='noopener noreferrer'
+                    href='/docs'
                     className='!text-semi-color-text-1'
                   >
                     {t('功能特性')}
@@ -95,25 +89,19 @@ const FooterBar = () => {
                 </p>
                 <div className='flex flex-col gap-4'>
                   <a
-                    href='https://docs.newapi.pro/getting-started/'
-                    target='_blank'
-                    rel='noopener noreferrer'
+                    href='/docs'
                     className='!text-semi-color-text-1'
                   >
                     {t('快速开始')}
                   </a>
                   <a
-                    href='https://docs.newapi.pro/installation/'
-                    target='_blank'
-                    rel='noopener noreferrer'
+                    href='/docs'
                     className='!text-semi-color-text-1'
                   >
                     {t('安装指南')}
                   </a>
                   <a
-                    href='https://docs.newapi.pro/api/'
-                    target='_blank'
-                    rel='noopener noreferrer'
+                    href='/docs'
                     className='!text-semi-color-text-1'
                   >
                     {t('API 文档')}

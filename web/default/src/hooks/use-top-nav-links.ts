@@ -38,6 +38,34 @@ const DEFAULT_HEADER_NAV_MODULES = {
   about: true,
 }
 
+const LEGACY_DOCS_DOMAIN = 'newapi' + '.pro'
+const LEGACY_DOCS_HOSTS = [`docs.${LEGACY_DOCS_DOMAIN}`, `doc.${LEGACY_DOCS_DOMAIN}`]
+
+function normalizeDocsLink(value: string | undefined): TopNavLink {
+  const docsLink = value?.trim()
+
+  if (!docsLink) {
+    return { title: '', href: '/docs' }
+  }
+
+  try {
+    const url = new URL(docsLink)
+    if (LEGACY_DOCS_HOSTS.includes(url.hostname)) {
+      return { title: '', href: '/docs' }
+    }
+  } catch {
+    if (LEGACY_DOCS_HOSTS.some((host) => docsLink.includes(host))) {
+      return { title: '', href: '/docs' }
+    }
+  }
+
+  return {
+    title: '',
+    href: docsLink,
+    external: !docsLink.startsWith('/'),
+  }
+}
+
 function parseAccessModule(
   raw: unknown,
   fallback: { enabled: boolean; requireAuth: boolean }
@@ -146,11 +174,8 @@ export function useTopNavLinks(): TopNavLink[] {
 
   // Docs (supports external links)
   if (modules?.docs !== false) {
-    if (docsLink) {
-      links.push({ title: t('Docs'), href: docsLink, external: true })
-    } else {
-      links.push({ title: t('Docs'), href: '/docs' })
-    }
+    const normalizedDocsLink = normalizeDocsLink(docsLink)
+    links.push({ ...normalizedDocsLink, title: t('Docs') })
   }
 
   // About
