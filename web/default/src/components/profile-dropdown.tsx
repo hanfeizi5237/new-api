@@ -22,6 +22,7 @@ import { User, Wallet, LogOut, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/auth-store'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
+import { cn } from '@/lib/utils'
 import { ROLE } from '@/lib/roles'
 import useDialogState from '@/hooks/use-dialog'
 import { useUserDisplay } from '@/hooks/use-user-display'
@@ -38,7 +39,11 @@ import { SignOutDialog } from '@/components/sign-out-dialog'
 
 const avatarFallbackClassName = 'font-semibold text-white'
 
-export function ProfileDropdown() {
+interface ProfileDropdownProps {
+  triggerClassName?: string
+}
+
+export function ProfileDropdown(props: ProfileDropdownProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [open, setOpen] = useDialogState()
@@ -56,7 +61,12 @@ export function ProfileDropdown() {
     <>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger
-          render={<Button variant='ghost' className='relative size-6 p-0' />}
+          render={
+            <Button
+              variant='ghost'
+              className={cn('relative size-6 p-0', props.triggerClassName)}
+            />
+          }
         >
           <Avatar className='size-6'>
             <AvatarFallback

@@ -54,7 +54,7 @@ export function Rankings() {
   }
 
   return (
-    <PublicLayout showMainContainer={false}>
+    <PublicLayout showMainContainer={false} headerProps={{ tone: 'light' }}>
       <div className='relative'>
         <div
           aria-hidden

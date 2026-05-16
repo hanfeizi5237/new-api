@@ -29,7 +29,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-export function ThemeSwitch() {
+interface ThemeSwitchProps {
+  triggerClassName?: string
+}
+
+export function ThemeSwitch(props: ThemeSwitchProps) {
   const { t } = useTranslation()
   const { theme, setTheme } = useTheme()
 
@@ -44,7 +48,13 @@ export function ThemeSwitch() {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
-        render={<Button variant='ghost' size='icon' className='h-9 w-9' />}
+        render={
+          <Button
+            variant='ghost'
+            size='icon'
+            className={cn('h-9 w-9', props.triggerClassName)}
+          />
+        }
       >
         <Sun className='size-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90' />
         <Moon className='absolute size-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0' />

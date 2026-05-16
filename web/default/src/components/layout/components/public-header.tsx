@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
+import { useTheme } from '@/context/theme-provider'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { LanguageSwitcher } from '@/components/language-switcher'
@@ -50,6 +51,7 @@ export interface PublicHeaderProps {
   showNavigation?: boolean
   showAuthButtons?: boolean
   showNotifications?: boolean
+  tone?: 'dark' | 'light'
   className?: string
 }
 
@@ -68,9 +70,11 @@ export function PublicHeader(props: PublicHeaderProps) {
     showNavigation = true,
     showAuthButtons = true,
     showNotifications = true,
+    tone = 'dark',
   } = props
 
   const { t } = useTranslation()
+  const { resolvedTheme } = useTheme()
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const { auth } = useAuthStore()
@@ -91,6 +95,7 @@ export function PublicHeader(props: PublicHeaderProps) {
   const links = dynamicLinks.length > 0 ? dynamicLinks : navLinks
   const mobileLinksList =
     dynamicLinks.length > 0 ? dynamicLinks : mobileLinks || navLinks
+  const isLightTone = tone === 'light' && resolvedTheme === 'light'
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -117,10 +122,23 @@ export function PublicHeader(props: PublicHeaderProps) {
         >
           <nav
             className={cn(
-              'cctoken-panel flex items-center justify-between transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
+              'flex items-center justify-between transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
+              isLightTone
+                ? 'border border-slate-200/80 bg-white/78 shadow-[0_16px_48px_rgba(148,163,184,0.22)] backdrop-blur-2xl'
+                : 'cctoken-panel',
               scrolled
-                ? 'h-14 rounded-[1.35rem] border-white/12 bg-slate-950/72 pr-2 pl-4 shadow-[0_16px_60px_rgba(2,6,23,0.4)]'
-                : 'mt-3 h-[4.25rem] rounded-[1.75rem] border-white/10 bg-slate-950/62 px-2 shadow-[0_16px_60px_rgba(2,6,23,0.34)]'
+                ? cn(
+                    'h-14 rounded-[1.35rem] pr-2 pl-4',
+                    isLightTone
+                      ? 'border-slate-200/90 bg-white/84 shadow-[0_18px_52px_rgba(148,163,184,0.18)]'
+                      : 'border-white/12 bg-slate-950/72 shadow-[0_16px_60px_rgba(2,6,23,0.4)]'
+                  )
+                : cn(
+                    'mt-3 h-[4.25rem] rounded-[1.75rem] px-2',
+                    isLightTone
+                      ? 'border-slate-200/80 bg-white/74 shadow-[0_18px_58px_rgba(148,163,184,0.2)]'
+                      : 'border-white/10 bg-slate-950/62 shadow-[0_16px_60px_rgba(2,6,23,0.34)]'
+                  )
             )}
           >
             {/* Logo */}
@@ -128,7 +146,14 @@ export function PublicHeader(props: PublicHeaderProps) {
               to={homeUrl}
               className='group flex shrink-0 items-center gap-3'
             >
-              <div className='flex size-9 shrink-0 items-center justify-center rounded-2xl border border-cyan-300/16 bg-white/5 transition-all duration-300 group-hover:scale-105'>
+              <div
+                className={cn(
+                  'flex size-9 shrink-0 items-center justify-center rounded-2xl transition-all duration-300 group-hover:scale-105',
+                  isLightTone
+                    ? 'border border-slate-200 bg-white/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]'
+                    : 'border border-cyan-300/16 bg-white/5'
+                )}
+              >
                 {loading ? (
                   <Skeleton className='size-full rounded-lg' />
                 ) : customLogo ? (
@@ -143,10 +168,22 @@ export function PublicHeader(props: PublicHeaderProps) {
                 )}
               </div>
               <div className='flex min-w-0 items-center gap-2'>
-                <span className='truncate text-sm font-semibold tracking-tight text-white'>
+                <span
+                  className={cn(
+                    'truncate text-sm font-semibold tracking-tight',
+                    isLightTone ? 'text-slate-900' : 'text-white'
+                  )}
+                >
                   {loading ? <Skeleton className='h-4 w-16' /> : displaySiteName}
                 </span>
-                <span className='hidden rounded-full border border-cyan-300/16 bg-cyan-300/8 px-2.5 py-1 text-[10px] font-semibold tracking-[0.18em] text-cyan-100 uppercase lg:inline-flex'>
+                <span
+                  className={cn(
+                    'hidden rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.18em] uppercase lg:inline-flex',
+                    isLightTone
+                      ? 'border border-sky-200/90 bg-sky-50 text-sky-700'
+                      : 'border border-cyan-300/16 bg-cyan-300/8 text-cyan-100'
+                  )}
+                >
                   {t('AI Hub')}
                 </span>
               </div>
@@ -163,10 +200,16 @@ export function PublicHeader(props: PublicHeaderProps) {
                   const sharedClassName = cn(
                     'rounded-full px-3 py-2 text-[13px] font-medium transition-all duration-200',
                     link.disabled
-                      ? 'pointer-events-none cursor-not-allowed border border-white/8 text-slate-500 opacity-60'
+                      ? isLightTone
+                        ? 'pointer-events-none cursor-not-allowed border border-slate-200/80 text-slate-400 opacity-60'
+                        : 'pointer-events-none cursor-not-allowed border border-white/8 text-slate-500 opacity-60'
                       : isActive
-                        ? 'border border-cyan-300/16 bg-cyan-300/10 text-white shadow-[0_0_18px_rgba(34,211,238,0.12)]'
-                        : 'text-slate-300 hover:bg-white/6 hover:text-white'
+                        ? isLightTone
+                          ? 'border border-sky-200/90 bg-sky-50 text-slate-950 shadow-[0_10px_24px_rgba(186,230,253,0.55)]'
+                          : 'border border-cyan-300/16 bg-cyan-300/10 text-white shadow-[0_0_18px_rgba(34,211,238,0.12)]'
+                        : isLightTone
+                          ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+                          : 'text-slate-300 hover:bg-white/6 hover:text-white'
                   )
 
                   if (link.external) {
@@ -205,38 +248,92 @@ export function PublicHeader(props: PublicHeaderProps) {
               {(showLanguageSwitcher ||
                 showThemeSwitch ||
                 showNotifications) && (
-                <div className='mx-2 h-5 w-px bg-white/10' />
+                <div
+                  className={cn(
+                    'mx-2 h-5 w-px',
+                    isLightTone ? 'bg-slate-200/90' : 'bg-white/10'
+                  )}
+                />
               )}
 
               {showNavigation && (
-                <div className='hidden items-center gap-2 rounded-full border border-white/8 bg-white/4 px-2 py-1 text-[10px] font-semibold tracking-[0.18em] text-slate-300 uppercase xl:inline-flex'>
-                  <Sparkles className='size-3.5 text-cyan-300' />
+                <div
+                  className={cn(
+                    'hidden items-center gap-2 rounded-full px-2 py-1 text-[10px] font-semibold tracking-[0.18em] uppercase xl:inline-flex',
+                    isLightTone
+                      ? 'border border-slate-200/90 bg-white/78 text-slate-600'
+                      : 'border border-white/8 bg-white/4 text-slate-300'
+                  )}
+                >
+                  <Sparkles
+                    className={cn(
+                      'size-3.5',
+                      isLightTone ? 'text-sky-500' : 'text-cyan-300'
+                    )}
+                  />
                   {t('Model routing')}
                 </div>
               )}
 
               {rightContent}
 
-              {showLanguageSwitcher && <LanguageSwitcher />}
-              {showThemeSwitch && <ThemeSwitch />}
+              {showLanguageSwitcher && (
+                <LanguageSwitcher
+                  triggerClassName={
+                    isLightTone
+                      ? 'rounded-full border border-slate-200/90 bg-white/78 text-slate-700 hover:bg-slate-100 hover:text-slate-950'
+                      : undefined
+                  }
+                />
+              )}
+              {showThemeSwitch && (
+                <ThemeSwitch
+                  triggerClassName={
+                    isLightTone
+                      ? 'rounded-full border border-slate-200/90 bg-white/78 text-slate-700 hover:bg-slate-100 hover:text-slate-950'
+                      : undefined
+                  }
+                />
+              )}
               {showNotifications && (
                 <NotificationButton
                   unreadCount={notifications.unreadCount}
                   onClick={() => notifications.openDialog()}
+                  className={
+                    isLightTone
+                      ? 'rounded-full border border-slate-200/90 bg-white/78 text-slate-700 hover:bg-slate-100 hover:text-slate-950'
+                      : undefined
+                  }
                 />
               )}
 
               {showAuthButtons && (
                 <>
-                  <div className='mx-1 h-5 w-px bg-white/10' />
+                  <div
+                    className={cn(
+                      'mx-1 h-5 w-px',
+                      isLightTone ? 'bg-slate-200/90' : 'bg-white/10'
+                    )}
+                  />
                   {loading ? (
                     <Skeleton className='h-8 w-20 rounded-lg' />
                   ) : isAuthenticated ? (
-                    <ProfileDropdown />
+                    <ProfileDropdown
+                      triggerClassName={
+                        isLightTone
+                          ? 'rounded-full ring-1 ring-slate-200/90 bg-white/78 hover:bg-slate-100'
+                          : undefined
+                      }
+                    />
                   ) : (
                     <Button
                       size='sm'
-                      className='h-9 rounded-full bg-cyan-400 px-4 text-xs font-semibold text-slate-950 hover:bg-cyan-300'
+                      className={cn(
+                        'h-9 rounded-full px-4 text-xs font-semibold',
+                        isLightTone
+                          ? 'bg-slate-950 text-white hover:bg-slate-800'
+                          : 'bg-cyan-400 text-slate-950 hover:bg-cyan-300'
+                      )}
                       render={<Link to='/sign-in' />}
                     >
                       {t('Sign in')}
@@ -248,17 +345,44 @@ export function PublicHeader(props: PublicHeaderProps) {
 
             {/* Mobile: compact actions + hamburger */}
             <div className='flex items-center gap-2 sm:hidden'>
-              {showLanguageSwitcher && <LanguageSwitcher />}
-              {showThemeSwitch && <ThemeSwitch />}
+              {showLanguageSwitcher && (
+                <LanguageSwitcher
+                  triggerClassName={
+                    isLightTone
+                      ? 'rounded-full border border-slate-200/90 bg-white/78 text-slate-700 hover:bg-slate-100 hover:text-slate-950'
+                      : undefined
+                  }
+                />
+              )}
+              {showThemeSwitch && (
+                <ThemeSwitch
+                  triggerClassName={
+                    isLightTone
+                      ? 'rounded-full border border-slate-200/90 bg-white/78 text-slate-700 hover:bg-slate-100 hover:text-slate-950'
+                      : undefined
+                  }
+                />
+              )}
               {showAuthButtons && !loading && isAuthenticated && (
-                <ProfileDropdown />
+                <ProfileDropdown
+                  triggerClassName={
+                    isLightTone
+                      ? 'rounded-full ring-1 ring-slate-200/90 bg-white/78 hover:bg-slate-100'
+                      : undefined
+                  }
+                />
               )}
               {showNavigation && (
                 <Button
                   type='button'
                   variant='ghost'
                   size='icon'
-                  className='size-10 rounded-full border border-white/10 bg-white/6 text-white hover:bg-white/10'
+                  className={cn(
+                    'size-10 rounded-full',
+                    isLightTone
+                      ? 'border border-slate-200/90 bg-white/80 text-slate-800 hover:bg-slate-100'
+                      : 'border border-white/10 bg-white/6 text-white hover:bg-white/10'
+                  )}
                   onClick={() => setMobileOpen((v) => !v)}
                   aria-label={t('Toggle navigation menu')}
                 >
@@ -292,16 +416,31 @@ export function PublicHeader(props: PublicHeaderProps) {
       {/* Mobile full-screen overlay */}
       <div
         className={cn(
-          'fixed inset-0 z-40 bg-[radial-gradient(circle_at_top,_rgb(34_211_238_/_0.14),_transparent_36%),radial-gradient(circle_at_80%_16%,_rgb(217_70_239_/_0.16),_transparent_24%),linear-gradient(180deg,_rgb(2_6_23_/_0.98),_rgb(3_7_18_/_0.98))] backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] sm:pointer-events-none sm:hidden',
+          'fixed inset-0 z-40 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] sm:pointer-events-none sm:hidden',
+          isLightTone
+            ? 'bg-[radial-gradient(circle_at_top,_rgb(56_189_248_/_0.10),_transparent_34%),radial-gradient(circle_at_80%_16%,_rgb(168_85_247_/_0.10),_transparent_24%),linear-gradient(180deg,_rgb(255_255_255_/_0.98),_rgb(248_250_252_/_0.98))]'
+            : 'bg-[radial-gradient(circle_at_top,_rgb(34_211_238_/_0.14),_transparent_36%),radial-gradient(circle_at_80%_16%,_rgb(217_70_239_/_0.16),_transparent_24%),linear-gradient(180deg,_rgb(2_6_23_/_0.98),_rgb(3_7_18_/_0.98))]',
           mobileOpen && showNavigation
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0'
         )}
       >
-        <div className='cctoken-grid absolute inset-0 opacity-[0.16]' />
+        <div
+          className={cn(
+            'cctoken-grid absolute inset-0',
+            isLightTone ? 'opacity-[0.08]' : 'opacity-[0.16]'
+          )}
+        />
         <div className='relative flex h-full flex-col justify-between px-8 pt-24 pb-10'>
           <div className='mb-10'>
-            <div className='inline-flex rounded-full border border-cyan-300/16 bg-cyan-300/8 px-4 py-2 text-[11px] font-semibold tracking-[0.22em] text-cyan-100 uppercase'>
+            <div
+              className={cn(
+                'inline-flex rounded-full px-4 py-2 text-[11px] font-semibold tracking-[0.22em] uppercase',
+                isLightTone
+                  ? 'border border-sky-200/90 bg-sky-50 text-sky-700'
+                  : 'border border-cyan-300/16 bg-cyan-300/8 text-cyan-100'
+              )}
+            >
               {t('Secure public access')}
             </div>
           </div>
@@ -309,9 +448,16 @@ export function PublicHeader(props: PublicHeaderProps) {
             {mobileLinksList.map((link, i) => {
               const isActive = !link.external && pathname === link.href
               const itemClassName = cn(
-                'flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/4 px-4 py-4 text-base font-medium tracking-tight text-white transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                'flex items-center justify-between gap-3 rounded-2xl px-4 py-4 text-base font-medium tracking-tight transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                isLightTone
+                  ? 'border border-slate-200/90 bg-white/78 text-slate-900'
+                  : 'border border-white/8 bg-white/4 text-white',
                 mobileOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0',
-                isActive ? 'border-cyan-300/18 bg-cyan-300/10' : '',
+                isActive
+                  ? isLightTone
+                    ? 'border-sky-200/90 bg-sky-50'
+                    : 'border-cyan-300/18 bg-cyan-300/10'
+                  : '',
                 link.disabled ? 'pointer-events-none opacity-50' : ''
               )
 
@@ -330,7 +476,12 @@ export function PublicHeader(props: PublicHeaderProps) {
                     aria-disabled={link.disabled}
                   >
                     {t(link.title)}
-                    <span className='text-xs tracking-[0.18em] text-slate-400 uppercase'>
+                    <span
+                      className={cn(
+                        'text-xs tracking-[0.18em] uppercase',
+                        isLightTone ? 'text-slate-500' : 'text-slate-400'
+                      )}
+                    >
                       0{i + 1}
                     </span>
                   </a>
@@ -349,7 +500,12 @@ export function PublicHeader(props: PublicHeaderProps) {
                   }}
                 >
                   {t(link.title)}
-                  <span className='text-xs tracking-[0.18em] text-slate-400 uppercase'>
+                  <span
+                    className={cn(
+                      'text-xs tracking-[0.18em] uppercase',
+                      isLightTone ? 'text-slate-500' : 'text-slate-400'
+                    )}
+                  >
                     0{i + 1}
                   </span>
                 </Link>
@@ -370,7 +526,12 @@ export function PublicHeader(props: PublicHeaderProps) {
               <Link
                 to={isAuthenticated ? '/dashboard' : '/sign-in'}
                 onClick={() => setMobileOpen(false)}
-                className='inline-flex h-11 items-center justify-center rounded-full bg-cyan-400 text-sm font-semibold text-slate-950 transition-opacity hover:opacity-90 active:opacity-80'
+                className={cn(
+                  'inline-flex h-11 items-center justify-center rounded-full text-sm font-semibold transition-opacity hover:opacity-90 active:opacity-80',
+                  isLightTone
+                    ? 'bg-slate-950 text-white'
+                    : 'bg-cyan-400 text-slate-950'
+                )}
               >
                 {isAuthenticated ? t('Go to Dashboard') : t('Sign in')}
               </Link>

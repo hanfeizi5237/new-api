@@ -39,7 +39,11 @@ const languages = [
   { code: 'vi', label: 'Tiếng Việt' },
 ]
 
-export function LanguageSwitcher() {
+interface LanguageSwitcherProps {
+  triggerClassName?: string
+}
+
+export function LanguageSwitcher(props: LanguageSwitcherProps) {
   const { i18n, t } = useTranslation()
   const user = useAuthStore((s) => s.auth.user)
 
@@ -60,7 +64,13 @@ export function LanguageSwitcher() {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
-        render={<Button variant='ghost' size='icon' className='h-9 w-9' />}
+        render={
+          <Button
+            variant='ghost'
+            size='icon'
+            className={cn('h-9 w-9', props.triggerClassName)}
+          />
+        }
       >
         <Languages className='size-[1.2rem]' />
         <span className='sr-only'>{t('Change language')}</span>
