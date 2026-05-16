@@ -40,7 +40,7 @@ export function UsageGuidesPage(props: UsageGuidesPageProps) {
   }
 
   return (
-    <PublicLayout showMainContainer={false}>
+    <PublicLayout showMainContainer={false} headerProps={{ tone: 'light' }}>
       <main className='relative overflow-x-hidden'>
         <div
           aria-hidden
