@@ -57,7 +57,7 @@ function FooterLinkItem(props: { link: FooterLink }) {
         href={props.link.href}
         target='_blank'
         rel='noopener noreferrer'
-        className='text-muted-foreground hover:text-foreground text-sm transition-colors duration-200'
+        className='text-sm text-slate-300 transition-colors duration-200 hover:text-white'
       >
         {label}
       </a>
@@ -67,26 +67,26 @@ function FooterLinkItem(props: { link: FooterLink }) {
   return (
     <Link
       to={props.link.href}
-      className='text-muted-foreground hover:text-foreground text-sm transition-colors duration-200'
+      className='text-sm text-slate-300 transition-colors duration-200 hover:text-white'
     >
       {label}
     </Link>
   )
 }
 
-function ProjectAttribution(props: { currentYear: number }) {
+function ProjectAttribution(props: { currentYear: number; brandName: string }) {
   const { t } = useTranslation()
 
   return (
-    <div className='text-muted-foreground/45 text-center text-xs sm:text-right'>
-      <span className='text-muted-foreground/45'>
+    <div className='text-center text-xs text-slate-500 sm:text-right'>
+      <span className='text-slate-500'>
         &copy; {props.currentYear}{' '}
         <a
           target='_blank'
           rel='noopener noreferrer'
-          className='text-foreground/70 hover:text-foreground font-medium transition-colors'
+          className='font-medium text-slate-200 transition-colors hover:text-white'
         >
-          {t('CCToken')}
+          {props.brandName}
         </a>
         . {t(NEW_API_FOOTER_ATTRIBUTION_KEY)}
       </span>
@@ -171,18 +171,21 @@ export function Footer(props: FooterProps) {
     return (
       <footer
         className={cn(
-          'border-border/40 relative z-10 border-t',
+          'relative z-10 border-t border-white/8',
           props.className
         )}
       >
-        <div className='mx-auto w-full max-w-6xl px-6 py-5'>
-          <div className='bg-muted/20 border-border/50 flex flex-col items-center justify-between gap-4 rounded-2xl border px-4 py-4 backdrop-blur-sm sm:flex-row sm:px-5'>
+        <div className='mx-auto w-full max-w-7xl px-6 py-6'>
+          <div className='cctoken-panel flex flex-col items-center justify-between gap-4 rounded-[1.8rem] px-4 py-4 sm:flex-row sm:px-5'>
             <div
-              className='custom-footer text-muted-foreground min-w-0 text-center text-sm sm:text-left'
+              className='custom-footer min-w-0 text-center text-sm text-slate-300 sm:text-left'
               dangerouslySetInnerHTML={{ __html: footerHtml }}
             />
-            <div className='border-border/60 w-full border-t pt-4 sm:w-auto sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5'>
-              <ProjectAttribution currentYear={currentYear} />
+            <div className='w-full border-t border-white/10 pt-4 sm:w-auto sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5'>
+              <ProjectAttribution
+                currentYear={currentYear}
+                brandName={displayName}
+              />
             </div>
           </div>
         </div>
@@ -192,55 +195,144 @@ export function Footer(props: FooterProps) {
 
   return (
     <footer
-      className={cn('border-border/40 relative z-10 border-t', props.className)}
+      className={cn('relative z-10 border-t border-white/8', props.className)}
     >
-      <div className='mx-auto max-w-6xl px-6 py-12 md:py-16'>
-        <div className='flex flex-col justify-between gap-10 md:flex-row md:gap-16'>
+      <div className='mx-auto max-w-7xl px-6 py-12 md:py-16'>
+        <div className='grid gap-8 lg:grid-cols-[1.15fr_0.85fr]'>
           {/* Brand column */}
-          <div className='shrink-0'>
-            <Link to='/' className='group flex items-center gap-2.5'>
-              <img
-                src={displayLogo}
-                alt={displayName}
-                className='size-7 rounded-lg object-contain'
-              />
-              <span className='text-sm font-semibold tracking-tight'>
-                {displayName}
-              </span>
+          <div className='cctoken-panel-strong rounded-[2rem] p-6 md:p-7'>
+            <Link to='/' className='group flex items-center gap-3'>
+              <div className='flex size-11 items-center justify-center rounded-2xl border border-cyan-300/16 bg-white/5'>
+                <img
+                  src={displayLogo}
+                  alt={displayName}
+                  className='size-7 rounded-xl object-contain'
+                />
+              </div>
+              <div>
+                <span className='text-base font-semibold tracking-tight text-white'>
+                  {displayName}
+                </span>
+                <div className='text-[10px] tracking-[0.22em] text-cyan-100 uppercase'>
+                  {t('AI routing command')}
+                </div>
+              </div>
             </Link>
-            <p className='text-muted-foreground/60 mt-3 max-w-[200px] text-xs leading-relaxed'>
-              {t('Powerful API Management Platform')}
+            <p className='mt-5 max-w-md text-sm leading-7 text-slate-300'>
+              {t(
+                'This gateway helps teams present one branded AI access layer while keeping routing policy, security posture, and usage operations in view.'
+              )}
             </p>
-          </div>
 
-          {/* Links columns */}
-          {isDemoSiteMode && (
-            <div className='grid grid-cols-3 gap-8 md:gap-16'>
-              {displayColumns.map((column, index) => (
-                <div key={index}>
-                  <p className='text-muted-foreground/50 mb-3 text-xs font-medium tracking-wider uppercase'>
-                    {t(column.title)}
-                  </p>
-                  <ul className='space-y-2.5'>
-                    {column.links.map((link, linkIndex) => (
-                      <li key={linkIndex}>
-                        <FooterLinkItem link={link} />
-                      </li>
-                    ))}
-                  </ul>
+            <div className='mt-6 flex flex-wrap gap-2.5'>
+              {[
+                t('Unified access'),
+                t('Balance control'),
+                t('Smart routing'),
+                t('Usage visibility'),
+              ].map((label) => (
+                <div
+                  key={label}
+                  className='cctoken-chip rounded-full px-3.5 py-2 text-xs text-slate-100'
+                >
+                  {label}
                 </div>
               ))}
             </div>
-          )}
+
+            <div className='mt-8 grid gap-3 sm:grid-cols-3'>
+              {[
+                {
+                  value: '24/7',
+                  label: t('operations surface'),
+                },
+                {
+                  value: 'AI',
+                  label: t('model ecosystem ready'),
+                },
+                {
+                  value: 'LIVE',
+                  label: t('usage governance'),
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className='rounded-[1.4rem] border border-white/8 bg-white/4 px-4 py-4'
+                >
+                  <div className='text-lg font-semibold text-white'>{item.value}</div>
+                  <div className='mt-1 text-xs tracking-[0.18em] text-slate-400 uppercase'>
+                    {item.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className='grid gap-4'>
+            <div className='cctoken-panel rounded-[2rem] p-6'>
+              <div className='text-[11px] font-semibold tracking-[0.22em] text-slate-400 uppercase'>
+                {t('Platform support')}
+              </div>
+              <div className='mt-4 grid gap-4 sm:grid-cols-2'>
+                <div>
+                  <div className='text-sm font-semibold text-white'>
+                    {t('Public access')}
+                  </div>
+                  <div className='mt-2 text-sm leading-6 text-slate-300'>
+                    {t('Brand the public-facing experience without losing operational clarity.')}
+                  </div>
+                </div>
+                <div>
+                  <div className='text-sm font-semibold text-white'>
+                    {t('Operator workflows')}
+                  </div>
+                  <div className='mt-2 text-sm leading-6 text-slate-300'>
+                    {t('Keep authentication, pricing entry, and monitoring handoffs consistent.')}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {isDemoSiteMode && (
+              <div className='cctoken-panel rounded-[2rem] p-6'>
+                <div className='grid grid-cols-1 gap-6 sm:grid-cols-3'>
+                  {displayColumns.map((column, index) => (
+                    <div key={index}>
+                      <p className='mb-3 text-xs font-medium tracking-[0.2em] text-slate-400 uppercase'>
+                        {t(column.title)}
+                      </p>
+                      <ul className='space-y-2.5'>
+                        {column.links.map((link, linkIndex) => (
+                          <li key={linkIndex}>
+                            <FooterLinkItem link={link} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Bottom section */}
-        <div className='border-border/30 mt-12 flex flex-col items-center justify-between gap-3 border-t pt-6 sm:flex-row'>
-          <p className='text-muted-foreground/40 text-xs'>
+        <div className='mt-8 flex flex-col gap-4 rounded-[1.6rem] border border-white/8 bg-slate-950/46 px-5 py-4 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between'>
+          <p className='text-xs text-slate-400'>
             &copy; {currentYear} {displayName}.{' '}
             {props.copyright ?? t('footer.defaultCopyright')}
           </p>
-          <ProjectAttribution currentYear={currentYear} />
+          <div className='flex flex-wrap items-center gap-3 text-[11px] tracking-[0.18em] text-slate-500 uppercase'>
+            <span>{t('Public brand layer')}</span>
+            <span className='text-white/18'>/</span>
+            <span>{t('Model access operations')}</span>
+            <span className='text-white/18'>/</span>
+            <span>{t('Protected attribution retained')}</span>
+          </div>
+          <ProjectAttribution
+            currentYear={currentYear}
+            brandName={displayName}
+          />
         </div>
       </div>
     </footer>

@@ -16,8 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useRef, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+import type { ReactNode } from 'react'
+import { Activity, Gauge, Shield, WalletCards } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useSystemConfig } from '@/hooks/use-system-config'
 
 interface CounterProps {
   end: number
@@ -69,7 +72,7 @@ function Counter(props: CounterProps) {
           observer.unobserve(el)
         }
       },
-      { threshold: 0.5 }
+      { threshold: 0.45 }
     )
 
     observer.observe(el)
@@ -87,42 +90,87 @@ interface StatsProps {
   className?: string
 }
 
-interface StatItem {
+interface StatValue {
   end: number
   suffix: string
-  label: string
+  prefix?: string
   decimals?: number
 }
 
 export function Stats(_props: StatsProps) {
   const { t } = useTranslation()
+  const { displayTokenStatEnabled } = useSystemConfig()
 
-  const stats: StatItem[] = [
-    { end: 50, suffix: '+', label: t('upstream services integrated') },
-    { end: 100, suffix: '+', label: t('model billing support') },
-    { end: 50, suffix: '+', label: t('compatible API routes') },
-    { end: 10, suffix: '+', label: t('scheduling controls') },
+  if (displayTokenStatEnabled === false) {
+    return null
+  }
+
+  const stats: Array<{
+    icon: ReactNode
+    value: StatValue
+    label: string
+    note: string
+  }> = [
+    {
+      icon: <Activity className='size-5 text-cyan-300' />,
+      value: { end: 40, suffix: '+' },
+      label: t('mainstream agents and providers'),
+      note: t('ready to connect'),
+    },
+    {
+      icon: <Gauge className='size-5 text-sky-300' />,
+      value: { end: 100, suffix: 'K+' },
+      label: t('daily routing decisions'),
+      note: t('policy aware dispatch'),
+    },
+    {
+      icon: <Shield className='size-5 text-fuchsia-300' />,
+      value: { end: 99.99, suffix: '%', decimals: 2 },
+      label: t('security and stability posture'),
+      note: t('multi-layer controls'),
+    },
+    {
+      icon: <WalletCards className='size-5 text-emerald-300' />,
+      value: { end: 24, suffix: '/7' },
+      label: t('balance and billing visibility'),
+      note: t('always on governance'),
+    },
   ]
 
   return (
-    <div className='border-border/40 bg-muted/10 relative z-10 border-y'>
-      <div className='mx-auto max-w-6xl px-6 py-10 md:py-12'>
-        <div className='grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-12'>
-          {stats.map((s) => (
+    <section className='relative z-10 px-6 py-6 md:py-8'>
+      <div className='cctoken-panel-strong mx-auto max-w-7xl rounded-[2rem] px-5 py-5 md:px-8 md:py-6'>
+        <div className='grid gap-4 md:grid-cols-4 md:gap-0'>
+          {stats.map((stat, index) => (
             <div
-              key={s.label}
-              className='flex flex-col items-center text-center'
+              key={stat.label}
+              className={`flex items-start gap-4 rounded-[1.4rem] px-3 py-3 md:px-5 ${
+                index < stats.length - 1
+                  ? 'md:border-r md:border-white/8'
+                  : ''
+              }`}
             >
-              <span className='text-2xl font-bold tracking-tight md:text-3xl'>
-                <Counter end={s.end} suffix={s.suffix} decimals={s.decimals} />
-              </span>
-              <span className='text-muted-foreground mt-1.5 text-xs'>
-                {s.label}
-              </span>
+              <div className='flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5'>
+                {stat.icon}
+              </div>
+              <div>
+                <div className='text-[1.75rem] leading-none font-semibold tracking-[-0.04em] text-white'>
+                  <Counter
+                    end={stat.value.end}
+                    suffix={stat.value.suffix}
+                    prefix={stat.value.prefix}
+                    decimals={stat.value.decimals}
+                  />
+                </div>
+                <div className='mt-2 text-sm text-slate-200'>{stat.label}</div>
+                <div className='mt-1 text-xs tracking-[0.18em] text-slate-400 uppercase'>
+                  {stat.note}
+                </div>
+              </div>
             </div>
           ))}
         </div>
       </div>
-    </div>
+    </section>
   )
 }

@@ -17,14 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import {
-  Zap,
+  BarChart3,
+  Binary,
+  Coins,
+  Layers3,
   Shield,
-  Globe,
-  Code,
-  Gauge,
-  DollarSign,
-  Users,
-  HeartHandshake,
+  Waypoints,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { AnimateInView } from '@/components/animate-in-view'
@@ -38,199 +36,185 @@ export function Features(_props: FeaturesProps) {
 
   const features = [
     {
-      id: 'fast',
-      num: '01',
-      title: t('Lightning Fast'),
+      title: t('Unified model gateway'),
       desc: t(
-        'Optimized network architecture ensures millisecond response times'
+        'Expose one stable access layer while connecting OpenAI, Google, Anthropic, DeepSeek, xAI, GLM, Qwen, and other provider paths behind the scenes.'
       ),
-      span: 'md:col-span-2',
-      icon: <Zap className='size-4 text-blue-400' />,
+      icon: <Layers3 className='size-5 text-cyan-300' />,
       visual: (
-        <div className='mt-4 grid grid-cols-3 gap-2'>
-          {['OpenAI', 'Claude', 'Gemini', 'DeepSeek', 'Qwen', 'Llama'].map(
-            (name) => (
-              <div
-                key={name}
-                className='border-border/30 bg-muted/20 text-muted-foreground flex items-center justify-center rounded-lg border px-3 py-2 text-xs transition-colors duration-300 hover:border-blue-500/30 hover:bg-blue-500/5'
-              >
-                {name}
-              </div>
-            )
-          )}
+        <div className='mt-5 flex flex-wrap gap-2'>
+          {[
+            'OpenAI',
+            'Google',
+            'Anthropic',
+            'xAI',
+            'DeepSeek',
+            'GLM',
+            'Qwen',
+            'MiniMax',
+          ].map((label) => (
+            <span
+              key={label}
+              className='cctoken-chip rounded-full px-3 py-2 text-xs text-slate-100'
+            >
+              {label}
+            </span>
+          ))}
         </div>
       ),
+      span: 'lg:col-span-2',
     },
     {
-      id: 'secure',
-      num: '02',
-      title: t('Secure & Reliable'),
+      title: t('Balance-governed routing'),
       desc: t(
-        'Enterprise-grade security with comprehensive permission management'
+        'Guard user balances and channel health before traffic is dispatched so subscriptions, quota, and usage policies remain consistent.'
       ),
-      span: 'md:col-span-1',
-      icon: <Shield className='size-4 text-emerald-400' />,
+      icon: <Coins className='size-5 text-emerald-300' />,
       visual: (
-        <div className='mt-4 flex items-center justify-center'>
-          <div className='relative'>
-            <div className='flex size-16 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/5'>
-              <Shield
-                className='size-7 text-emerald-500/70'
-                strokeWidth={1.5}
+        <div className='mt-5 grid gap-2'>
+          {[
+            t('Account balance'),
+            t('Subscription rights'),
+            t('Quota threshold'),
+          ].map((label) => (
+            <div
+              key={label}
+              className='flex items-center justify-between rounded-2xl border border-white/8 bg-white/4 px-4 py-3 text-sm text-slate-100'
+            >
+              <span>{label}</span>
+              <span className='h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.7)]' />
+            </div>
+          ))}
+        </div>
+      ),
+      span: 'lg:col-span-1',
+    },
+    {
+      title: t('Routing policy engine'),
+      desc: t(
+        'Mix fallback, traffic steering, and provider priority rules to choose the right upstream path in real time.'
+      ),
+      icon: <Waypoints className='size-5 text-fuchsia-300' />,
+      visual: (
+        <div className='mt-5 grid gap-3'>
+          {[
+            t('Latency first'),
+            t('Cost optimized'),
+            t('Provider fallback'),
+            t('Model-specific rules'),
+          ].map((label, index) => (
+            <div key={label} className='flex items-center gap-3'>
+              <span className='flex size-7 items-center justify-center rounded-full border border-fuchsia-300/20 bg-fuchsia-300/10 text-[11px] font-semibold text-fuchsia-200'>
+                0{index + 1}
+              </span>
+              <div className='h-px flex-1 bg-gradient-to-r from-fuchsia-300/40 to-transparent' />
+              <span className='text-sm text-slate-200'>{label}</span>
+            </div>
+          ))}
+        </div>
+      ),
+      span: 'lg:col-span-1',
+    },
+    {
+      title: t('Operator telemetry'),
+      desc: t(
+        'Watch traffic, usage, latency, and cost from one operational surface instead of checking each provider separately.'
+      ),
+      icon: <BarChart3 className='size-5 text-sky-300' />,
+      visual: (
+        <div className='mt-5 grid grid-cols-4 gap-2'>
+          {[42, 68, 56, 84, 36, 72, 58, 88].map((bar, index) => (
+            <div
+              key={index}
+              className='rounded-full bg-white/6 p-1'
+            >
+              <div
+                className='rounded-full bg-gradient-to-t from-cyan-300 via-sky-400 to-fuchsia-400'
+                style={{ height: `${bar}px` }}
               />
             </div>
-            <div className='absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-emerald-500'>
-              <svg
-                className='size-2.5 text-white'
-                fill='none'
-                viewBox='0 0 24 24'
-                stroke='currentColor'
-                strokeWidth={3}
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  d='m4.5 12.75 6 6 9-13.5'
-                />
-              </svg>
-            </div>
-          </div>
+          ))}
         </div>
       ),
+      span: 'lg:col-span-1',
     },
     {
-      id: 'global',
-      num: '03',
-      title: t('Global Coverage'),
-      desc: t('Multi-region deployment for stable global access'),
-      span: 'md:col-span-1',
-      icon: <Globe className='size-4 text-violet-400' />,
+      title: t('Security by default'),
+      desc: t(
+        'Layer permissions, rate limits, isolation, and audit-friendly controls around public access and team operations.'
+      ),
+      icon: <Shield className='size-5 text-cyan-300' />,
       visual: (
-        <div className='mt-4 space-y-2'>
-          {[t('Load Balancing'), t('Rate Limiting'), t('Cost Tracking')].map(
-            (step, i) => (
-              <div key={step} className='flex items-center gap-2'>
-                <div
-                  className={`flex size-6 items-center justify-center rounded-full text-[10px] font-bold ${
-                    i === 1
-                      ? 'border border-blue-500/30 bg-blue-500/20 text-blue-500'
-                      : 'border-border/40 bg-muted text-muted-foreground border'
-                  }`}
-                >
-                  {i + 1}
-                </div>
-                <div className='bg-border/40 h-px flex-1' />
-                <span className='text-muted-foreground text-xs'>{step}</span>
+        <div className='mt-5 grid gap-2 md:grid-cols-2'>
+          {[t('Rate limit'), t('RBAC'), t('Audit logs'), t('Alerts')].map(
+            (label) => (
+              <div
+                key={label}
+                className='rounded-2xl border border-white/8 bg-white/4 px-4 py-3 text-center text-sm text-slate-100'
+              >
+                {label}
               </div>
             )
           )}
         </div>
       ),
+      span: 'lg:col-span-1',
     },
     {
-      id: 'developer',
-      num: '04',
-      title: t('Developer Friendly'),
-      desc: t('Compatible API routes for common AI application workflows'),
-      span: 'md:col-span-2',
-      icon: <Code className='size-4 text-amber-400' />,
+      title: t('Developer compatibility'),
+      desc: t(
+        'Keep common agent and client access patterns working while your team gains room to grow traffic governance and billing control.'
+      ),
+      icon: <Binary className='size-5 text-amber-300' />,
       visual: (
-        <div className='mt-4 flex items-center gap-3'>
-          <div className='flex -space-x-2'>
-            {['API', 'SDK', 'CLI', 'Docs'].map((n) => (
-              <div
-                key={n}
-                className='border-background from-muted to-muted/60 text-muted-foreground flex size-8 items-center justify-center rounded-full border-2 bg-gradient-to-br text-[9px] font-bold'
-              >
-                {n}
-              </div>
-            ))}
-          </div>
-          <div className='text-muted-foreground flex items-center gap-1.5 text-xs'>
-            <Code className='size-3.5 text-blue-500' />
-            {t('Multi-protocol Compatible')}
-          </div>
+        <div className='mt-5 rounded-[1.6rem] border border-white/8 bg-slate-950/70 p-4 font-mono text-xs text-slate-300'>
+          <div>POST /v1/chat/completions</div>
+          <div className='mt-2 text-cyan-300'>{'>'} route: best-channel</div>
+          <div className='mt-2 text-fuchsia-300'>{'>'} guard: balance-aware</div>
+          <div className='mt-2 text-emerald-300'>{'>'} trace: usage-live</div>
         </div>
       ),
-    },
-  ]
-
-  const additionalFeatures = [
-    {
-      icon: <Gauge className='size-5' strokeWidth={1.5} />,
-      title: t('High Performance'),
-      desc: t('Support for high concurrency with automatic load balancing'),
-    },
-    {
-      icon: <DollarSign className='size-5' strokeWidth={1.5} />,
-      title: t('Transparent Billing'),
-      desc: t('Pay-as-you-go with real-time usage monitoring'),
-    },
-    {
-      icon: <Users className='size-5' strokeWidth={1.5} />,
-      title: t('Team Collaboration'),
-      desc: t('Multi-user management with flexible permission allocation'),
-    },
-    {
-      icon: <HeartHandshake className='size-5' strokeWidth={1.5} />,
-      title: t('Open Source'),
-      desc: t('Community driven, self-hosted, and extensible'),
+      span: 'lg:col-span-2',
     },
   ]
 
   return (
-    <section className='relative z-10 px-6 py-24 md:py-32'>
-      <div className='mx-auto max-w-6xl'>
-        <AnimateInView className='mb-16 max-w-lg'>
-          <p className='text-muted-foreground mb-3 text-xs font-medium tracking-widest uppercase'>
-            {t('Core Features')}
-          </p>
-          <h2 className='text-2xl leading-tight font-bold tracking-tight md:text-3xl'>
-            {t('Built for developers,')}
+    <section className='relative z-10 px-6 py-[4.5rem] md:py-24'>
+      <div className='mx-auto max-w-7xl'>
+        <AnimateInView className='mx-auto max-w-3xl text-center'>
+          <div className='inline-flex rounded-full border border-cyan-300/16 bg-cyan-300/6 px-4 py-2 text-[11px] font-semibold tracking-[0.22em] text-cyan-100 uppercase'>
+            {t('Capability matrix')}
+          </div>
+          <h2 className='mt-5 text-3xl font-semibold tracking-[-0.05em] text-white md:text-5xl'>
+            {t('Built to operate an AI access layer,')}
             <br />
-            {t('designed for scale')}
+            <span className='text-slate-300'>{t('not just display one')}</span>
           </h2>
+          <p className='mx-auto mt-5 max-w-2xl text-base leading-8 text-slate-300'>
+            {t(
+              'Every panel in this gateway is designed around real routing work: access compatibility, balance protection, traffic policy, and production visibility.'
+            )}
+          </p>
         </AnimateInView>
 
-        {/* Bento grid */}
-        <div className='border-border/40 bg-border/40 grid gap-px overflow-hidden rounded-xl border md:grid-cols-3'>
-          {features.map((f, i) => (
+        <div className='mt-12 grid gap-4 lg:grid-cols-3'>
+          {features.map((feature, index) => (
             <AnimateInView
-              key={f.id}
-              delay={i * 100}
-              animation='scale-in'
-              className={`bg-background group hover:bg-muted/20 p-7 transition-colors duration-300 md:p-8 ${f.span}`}
-            >
-              <div className='mb-3 flex items-center gap-3'>
-                <span className='border-border/40 bg-muted text-muted-foreground flex size-7 items-center justify-center rounded-md border text-[10px] font-semibold tabular-nums'>
-                  {f.num}
-                </span>
-                <h3 className='text-sm font-semibold'>{f.title}</h3>
-              </div>
-              <p className='text-muted-foreground text-sm leading-relaxed'>
-                {f.desc}
-              </p>
-              {f.visual}
-            </AnimateInView>
-          ))}
-        </div>
-
-        {/* Additional features row */}
-        <div className='mt-12 grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-12'>
-          {additionalFeatures.map((f, i) => (
-            <AnimateInView
-              key={f.title}
-              delay={i * 100}
+              key={feature.title}
+              delay={index * 80}
               animation='fade-up'
-              className='flex flex-col items-center text-center'
+              className={`cctoken-panel rounded-[2rem] p-6 md:p-7 ${feature.span}`}
             >
-              <div className='text-muted-foreground border-border/50 bg-muted/30 group-hover:text-foreground mb-3 flex size-12 items-center justify-center rounded-xl border transition-colors'>
-                {f.icon}
+              <div className='flex items-center gap-3 text-white'>
+                <span className='flex size-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5'>
+                  {feature.icon}
+                </span>
+                <h3 className='text-lg font-semibold'>{feature.title}</h3>
               </div>
-              <h3 className='mb-1.5 text-sm font-semibold'>{f.title}</h3>
-              <p className='text-muted-foreground max-w-[200px] text-xs leading-relaxed'>
-                {f.desc}
+              <p className='mt-4 text-sm leading-7 text-slate-300 md:text-[15px]'>
+                {feature.desc}
               </p>
+              {feature.visual}
             </AnimateInView>
           ))}
         </div>

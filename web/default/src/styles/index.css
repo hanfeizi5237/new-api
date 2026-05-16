@@ -583,3 +583,120 @@ For commercial licensing, please contact support@quantumnous.com
     animation: none !important;
   }
 }
+
+@keyframes cctoken-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes cctoken-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+@layer utilities {
+  .cctoken-shell {
+    background:
+      radial-gradient(circle at top, rgb(19 53 111 / 0.35), transparent 36%),
+      radial-gradient(circle at 85% 20%, rgb(168 85 247 / 0.18), transparent 28%),
+      linear-gradient(180deg, rgb(3 10 28 / 0.96), rgb(5 11 24 / 1));
+  }
+
+  .cctoken-grid {
+    background-image:
+      linear-gradient(rgb(148 163 184 / 0.09) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(148 163 184 / 0.09) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  .cctoken-panel {
+    border: 1px solid rgb(103 232 249 / 0.16);
+    background:
+      linear-gradient(180deg, rgb(9 16 38 / 0.92), rgb(6 10 24 / 0.88)),
+      linear-gradient(120deg, rgb(6 182 212 / 0.08), transparent 40%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.04),
+      0 20px 60px rgb(2 6 23 / 0.45);
+    backdrop-filter: blur(22px);
+  }
+
+  .cctoken-panel-strong {
+    border: 1px solid rgb(96 165 250 / 0.28);
+    background:
+      radial-gradient(circle at top, rgb(34 211 238 / 0.11), transparent 40%),
+      linear-gradient(180deg, rgb(7 14 30 / 0.98), rgb(4 8 19 / 0.96));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.06),
+      0 24px 80px rgb(2 6 23 / 0.55),
+      0 0 0 1px rgb(34 211 238 / 0.05);
+    backdrop-filter: blur(24px);
+  }
+
+  .cctoken-chip {
+    border: 1px solid rgb(148 163 184 / 0.16);
+    background: linear-gradient(180deg, rgb(15 23 42 / 0.82), rgb(2 6 23 / 0.72));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+    backdrop-filter: blur(14px);
+  }
+
+  .cctoken-glow-text {
+    text-shadow:
+      0 0 22px rgb(34 211 238 / 0.25),
+      0 0 32px rgb(168 85 247 / 0.12);
+  }
+
+  .cctoken-rail-blue {
+    background:
+      linear-gradient(90deg, transparent 0%, rgb(34 211 238 / 0.9) 30%, rgb(59 130 246 / 0.95) 100%);
+    box-shadow:
+      0 0 16px rgb(34 211 238 / 0.45),
+      0 0 32px rgb(59 130 246 / 0.22);
+  }
+
+  .cctoken-rail-pink {
+    background:
+      linear-gradient(90deg, transparent 0%, rgb(217 70 239 / 0.9) 30%, rgb(244 114 182 / 0.95) 100%);
+    box-shadow:
+      0 0 16px rgb(217 70 239 / 0.42),
+      0 0 32px rgb(244 114 182 / 0.22);
+  }
+
+  .cctoken-scanline {
+    background-image: linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 46%,
+      rgb(255 255 255 / 0.035) 50%,
+      transparent 54%,
+      transparent 100%
+    );
+    background-size: 100% 8px;
+  }
+
+  .cctoken-core-ring {
+    animation: cctoken-pulse 4.5s ease-in-out infinite;
+  }
+
+  .cctoken-float {
+    animation: cctoken-drift 7s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cctoken-core-ring,
+  .cctoken-float {
+    animation: none !important;
+  }
+}

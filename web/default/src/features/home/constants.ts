@@ -43,6 +43,27 @@ export const AI_MODELS = [
   'Gemini.Color',
 ] as const
 
+// Brand refresh - representative AI agents and provider ecosystem
+export const FEATURED_AI_AGENTS = [
+  'Codex',
+  'ClaudeCode',
+  'OpenHands',
+  'Openclaw',
+  'Hermes',
+  'OpenManus',
+] as const
+
+export const FEATURED_MODEL_PROVIDERS = [
+  'OpenAI',
+  'Google',
+  'Anthropic',
+  'Grok',
+  'DeepSeek',
+  'GLM',
+  'Qwen',
+  'MiniMax',
+] as const
+
 // Hero section - Gateway Features
 export const GATEWAY_FEATURES = [
   'Cost Tracking',

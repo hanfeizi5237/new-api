@@ -62,12 +62,26 @@ export function Home() {
 
   return (
     <PublicLayout showMainContainer={false}>
-      <Hero isAuthenticated={isAuthenticated} />
-      <Stats />
-      <Features />
-      <HowItWorks />
-      <CTA isAuthenticated={isAuthenticated} />
-      <Footer />
+      <main className='cctoken-shell relative overflow-x-hidden text-white'>
+        <div
+          aria-hidden
+          className='cctoken-grid pointer-events-none absolute inset-0 opacity-[0.18]'
+        />
+        <div
+          aria-hidden
+          className='pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-[radial-gradient(circle_at_top,_rgb(34_211_238_/_0.18),_transparent_48%),radial-gradient(circle_at_78%_12%,_rgb(217_70_239_/_0.16),_transparent_26%)]'
+        />
+        <div
+          aria-hidden
+          className='cctoken-scanline pointer-events-none absolute inset-0 opacity-[0.14]'
+        />
+        <Hero isAuthenticated={isAuthenticated} />
+        <Stats />
+        <Features />
+        <HowItWorks />
+        <CTA isAuthenticated={isAuthenticated} />
+        <Footer />
+      </main>
     </PublicLayout>
   )
 }
