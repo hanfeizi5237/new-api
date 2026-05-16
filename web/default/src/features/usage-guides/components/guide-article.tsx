@@ -85,9 +85,6 @@ export function GuideArticle(props: GuideArticleProps) {
       <Card className='border-border/80 bg-card/75 gap-0 rounded-[28px]'>
         <CardHeader className='pb-4'>
           <CardTitle className='text-lg'>接入思路</CardTitle>
-          <CardDescription>
-            第一版页面聚焦“如何把 CCToken 接进去”，不是完整替代对应应用的官方文档。
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <Markdown className='prose-sm sm:prose-base prose-p:text-foreground prose-p:leading-7'>
