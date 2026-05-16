@@ -46,9 +46,9 @@ export function Hero(props: HeroProps) {
   const brandSignals = [
     {
       icon: <Sparkles className='size-4 text-cyan-300' />,
-      title: t('Instant agent intake'),
+      title: t('Unified domain and key access'),
       desc: t(
-        'Accept requests from mainstream AI agents and normalize them through one controlled gateway.'
+        'Route global model traffic through one domain and one key system with consistent governance.'
       ),
     },
     {
@@ -60,7 +60,7 @@ export function Hero(props: HeroProps) {
       icon: <Route className='size-4 text-fuchsia-300' />,
       title: t('Smart traffic orchestration'),
       desc: t(
-        'Send every agent request to the provider path that best matches cost, speed, and policy.'
+        'Apply unified risk control and routing strategies so each request reaches the right provider path.'
       ),
     },
   ]
@@ -98,7 +98,7 @@ export function Hero(props: HeroProps) {
               style={{ animationDelay: '120ms' }}
             >
               {t(
-                'Turn fragmented agent entry and provider access into a single branded gateway for routing, balance control, secure access, and live usage visibility.'
+                'Connect global AI model resources through one domain, one key system, and one risk-control strategy for an access layer that is observable, extensible, and controllable.'
               )}
             </p>
           </div>
@@ -202,7 +202,7 @@ export function Hero(props: HeroProps) {
                     </div>
                     <p className='mt-3 max-w-xs text-sm leading-6 text-slate-300'>
                       {t(
-                        'Orchestrate agent-compatible channels, protect balances, and direct requests with live policy-aware routing.'
+                        'Unify domain access, key management, and policy control while directing requests with live strategy-aware routing.'
                       )}
                     </p>
                     <div className='mt-6 grid w-full gap-2'>
@@ -222,7 +222,7 @@ export function Hero(props: HeroProps) {
 
               <div className='cctoken-float cctoken-panel rounded-[2rem] p-4 [animation-delay:1.1s] md:p-5'>
                 <div className='mb-3 text-xs font-semibold tracking-[0.22em] text-fuchsia-200 uppercase'>
-                  {t('To providers')}
+                  {t('To AI providers')}
                 </div>
                 <div className='space-y-3'>
                   {FEATURED_MODEL_PROVIDERS.slice(0, 6).map((provider, index) => (

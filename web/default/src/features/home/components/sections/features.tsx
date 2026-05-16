@@ -36,9 +36,9 @@ export function Features(_props: FeaturesProps) {
 
   const features = [
     {
-      title: t('Unified model gateway'),
+      title: t('Unified model access layer'),
       desc: t(
-        'Expose one stable access layer while connecting OpenAI, Google, Anthropic, DeepSeek, xAI, GLM, Qwen, and other provider paths behind the scenes.'
+        'Present one domain and one key system to users while connecting OpenAI, Google, Anthropic, DeepSeek, xAI, GLM, Qwen, and other provider paths behind the scenes.'
       ),
       icon: <Layers3 className='size-5 text-cyan-300' />,
       visual: (
@@ -192,7 +192,7 @@ export function Features(_props: FeaturesProps) {
           </h2>
           <p className='mx-auto mt-5 max-w-2xl text-base leading-8 text-slate-300'>
             {t(
-              'Every panel in this gateway is designed around real routing work: access compatibility, balance protection, traffic policy, and production visibility.'
+              'Every panel in this access layer is designed around real operations: resource connectivity, strategy governance, observability, and scalable control.'
             )}
           </p>
         </AnimateInView>

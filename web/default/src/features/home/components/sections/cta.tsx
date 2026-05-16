@@ -54,15 +54,15 @@ export function CTA(props: CTAProps) {
                 {t('Deployment ready')}
               </div>
               <h2 className='mt-5 text-3xl font-semibold tracking-[-0.05em] text-white md:text-5xl'>
-                {t('Bring your AI traffic into')}
+                {t('Bring global model access under')}
                 <br />
                 <span className='bg-gradient-to-r from-cyan-300 via-sky-200 to-fuchsia-300 bg-clip-text text-transparent'>
-                  {t('one branded control layer')}
+                  {t('one controllable entry layer')}
                 </span>
               </h2>
               <p className='mt-5 max-w-2xl text-base leading-8 text-slate-300'>
                 {t(
-                  'Create a public entry point that feels like your product while keeping provider orchestration, security, and usage oversight in one place.'
+                  'Launch with one domain, one key system, and one risk-control strategy while keeping observability and provider expansion in your hands.'
                 )}
               </p>
             </div>
