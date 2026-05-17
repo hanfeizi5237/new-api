@@ -106,6 +106,20 @@ function ProjectAttribution(props: { currentYear: number; brandName: string }) {
   )
 }
 
+function ContactUsButton(props: { onClick: () => void }) {
+  const { t } = useTranslation()
+
+  return (
+    <button
+      type='button'
+      onClick={props.onClick}
+      className='cursor-pointer text-[11px] tracking-[0.18em] text-slate-400 uppercase transition-colors duration-200 hover:text-white'
+    >
+      {t('Contact us')}
+    </button>
+  )
+}
+
 export function Footer(props: FooterProps) {
   const { t } = useTranslation()
   const {
@@ -189,11 +203,12 @@ export function Footer(props: FooterProps) {
         )}
       >
         <div className='mx-auto w-full max-w-7xl px-6 py-6'>
-          <div className='cctoken-panel flex flex-col items-center justify-between gap-4 rounded-[1.8rem] px-4 py-4 sm:flex-row sm:px-5'>
+          <div className='cctoken-panel flex flex-col items-center gap-4 rounded-[1.8rem] px-4 py-4 sm:flex-row sm:px-5'>
             <div
               className='custom-footer min-w-0 text-center text-sm text-slate-300 sm:text-left'
               dangerouslySetInnerHTML={{ __html: footerHtml }}
             />
+            <ContactUsButton onClick={() => setIsContactDialogOpen(true)} />
             <div className='w-full border-t border-white/10 pt-4 sm:w-auto sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5'>
               <ProjectAttribution
                 currentYear={currentYear}
@@ -331,17 +346,7 @@ export function Footer(props: FooterProps) {
 
         {/* Bottom section */}
         <div className='mt-8 flex flex-col gap-4 rounded-[1.6rem] border border-white/8 bg-slate-950/46 px-5 py-4 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between'>
-          <p className='text-xs text-slate-400'>
-            &copy; {currentYear} {displayName}.{' '}
-            {props.copyright ?? t('footer.defaultCopyright')}
-          </p>
-          <button
-            type='button'
-            onClick={() => setIsContactDialogOpen(true)}
-            className='cursor-pointer text-[11px] tracking-[0.18em] text-slate-400 uppercase transition-colors duration-200 hover:text-white'
-          >
-            {t('Contact us')}
-          </button>
+          <ContactUsButton onClick={() => setIsContactDialogOpen(true)} />
           <ProjectAttribution
             currentYear={currentYear}
             brandName={displayName}
