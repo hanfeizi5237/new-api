@@ -57,13 +57,10 @@ const PageLayout = () => {
 
   const shouldHideFooter = cardProPages.includes(location.pathname);
 
-  const consoleLikeRoutes = ['/user-usage'];
-  const isConsoleRoute =
-    location.pathname.startsWith('/console') ||
-    consoleLikeRoutes.some((route) => location.pathname.startsWith(route));
+  const isConsoleRoute = location.pathname.startsWith('/console');
 
   const shouldInnerPadding =
-    (location.pathname.includes('/console') || location.pathname.startsWith('/user-usage')) &&
+    location.pathname.includes('/console') &&
     !location.pathname.startsWith('/console/chat') &&
     location.pathname !== '/console/playground';
 

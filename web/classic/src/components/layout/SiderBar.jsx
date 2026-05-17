@@ -37,7 +37,7 @@ const routerMap = {
   redemption: '/console/redemption',
   topup: '/console/topup',
   user: '/console/user',
-  userUsage: '/user-usage',
+  userUsage: '/console/user-usage',
   subscription: '/console/subscription',
   log: '/console/log',
   midjourney: '/console/midjourney',
@@ -187,7 +187,7 @@ const SiderBar = ({ onNavigate = () => {} }) => {
       {
         text: t('用户看板'),
         itemKey: 'userUsage',
-        to: '/user-usage',
+        to: '/console/user-usage',
         className: isAdmin() ? '' : 'tableHiddle',
       },
       {

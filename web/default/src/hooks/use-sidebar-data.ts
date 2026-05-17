@@ -28,6 +28,7 @@ import {
   User,
   Command,
   Radio,
+  BarChart3,
   FlaskConical,
   MessageSquare,
   CreditCard,
@@ -134,6 +135,12 @@ export function useSidebarData(): SidebarData {
             title: t('Users'),
             url: '/users',
             icon: Users,
+          },
+          {
+            title: t('User Analytics'),
+            url: '/console/user-usage',
+            activeUrls: ['/dashboard/users'],
+            icon: BarChart3,
           },
           {
             title: t('Redemption Codes'),

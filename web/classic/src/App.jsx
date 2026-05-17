@@ -317,7 +317,7 @@ function App() {
           }
         />
         <Route
-          path='/user-usage'
+          path='/console/user-usage'
           element={
             <AdminRoute>
               <Suspense fallback={<Loading></Loading>} key={location.pathname}>
