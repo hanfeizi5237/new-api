@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import {
   BarChart3,
   CircleCheckBig,
-  Coins,
   Link2,
   LifeBuoy,
   ListChecks,
@@ -237,88 +236,6 @@ function PricingGuideArticle({ guide }: { guide: UsageGuide }) {
 
   return (
     <article className='space-y-6'>
-      <section className='grid items-start gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]'>
-        <header className='border-border/80 bg-card/80 rounded-[28px] border px-6 py-7 shadow-sm backdrop-blur-sm sm:px-8'>
-          <div className='flex flex-wrap items-center gap-2'>
-            <Badge variant='outline' className='rounded-full px-2.5'>
-              价格说明
-            </Badge>
-            {guide.tags.map((tag) => (
-              <Badge key={tag} variant='outline' className='rounded-full px-2.5'>
-                {tag}
-              </Badge>
-            ))}
-          </div>
-          <h1 className='mt-4 text-3xl font-semibold tracking-tight sm:text-4xl'>
-            {guide.title}
-          </h1>
-          <p className='text-muted-foreground mt-3 max-w-4xl text-base leading-7'>
-            {guide.description}
-          </p>
-          <p className='mt-4 max-w-4xl text-base leading-7'>
-            {guide.summary}
-          </p>
-          <div className='mt-6 grid gap-3 sm:grid-cols-3'>
-            <div className='bg-background/70 border-border/70 rounded-2xl border px-4 py-4'>
-              <div className='text-muted-foreground text-xs tracking-[0.18em] uppercase'>
-                价格单位
-              </div>
-              <div className='mt-2 text-sm leading-6'>{guide.pricing?.unit}</div>
-            </div>
-            <div className='bg-background/70 border-border/70 rounded-2xl border px-4 py-4'>
-              <div className='text-muted-foreground text-xs tracking-[0.18em] uppercase'>
-                计费维度
-              </div>
-              <div className='mt-2 text-sm leading-6'>输入、输出、缓存读</div>
-            </div>
-            <div className='bg-background/70 border-border/70 rounded-2xl border px-4 py-4'>
-              <div className='text-muted-foreground text-xs tracking-[0.18em] uppercase'>
-                覆盖模型
-              </div>
-              <div className='mt-2 text-sm leading-6'>{rows.length} 个当前可售模型</div>
-            </div>
-          </div>
-        </header>
-
-        <div className='space-y-4'>
-          <Card className='border-border/80 bg-card/75 gap-0 rounded-[28px]'>
-            <CardHeader className='pb-4'>
-              <CardTitle className='flex items-center gap-2 text-lg'>
-                <Coins className='size-5' />
-                计费口径
-              </CardTitle>
-            </CardHeader>
-            <CardContent className='space-y-3'>
-              <div className='bg-background/80 border-border/70 rounded-2xl border px-4 py-3 text-sm leading-6'>
-                输入价格：适合看长上下文、检索增强和大提示词任务的基础成本。
-              </div>
-              <div className='bg-background/80 border-border/70 rounded-2xl border px-4 py-3 text-sm leading-6'>
-                输出价格：适合看复杂推理、长回复和代码生成场景的实际放大量。
-              </div>
-              <div className='bg-background/80 border-border/70 rounded-2xl border px-4 py-3 text-sm leading-6'>
-                缓存读价格：适合看重复提示词、多轮复用和稳定模板场景的边际成本。
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className='border-border/80 bg-card/75 gap-0 rounded-[28px]'>
-            <CardHeader className='pb-4'>
-              <CardTitle className='text-lg'>适合谁看</CardTitle>
-            </CardHeader>
-            <CardContent className='space-y-3'>
-              {guide.recommendedFor.map((item) => (
-                <div
-                  key={item}
-                  className='bg-background/80 border-border/70 rounded-2xl border px-4 py-3 text-sm leading-6'
-                >
-                  {item}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
       <section className='space-y-4'>
         <div className='flex items-center gap-2'>
           <BarChart3 className='size-5' />
