@@ -23,6 +23,7 @@ import {
   Code2,
   ExternalLink,
   MonitorSmartphone,
+  ReceiptText,
   Workflow,
   Wrench,
 } from 'lucide-react'
@@ -56,6 +57,7 @@ const guideIcons: Record<
   openclaw: Bot,
   'claude-code': Wrench,
   'codex-cli': Code2,
+  'pricing-usage': ReceiptText,
 }
 
 type GuideSidebarProps = {
