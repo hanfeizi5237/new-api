@@ -18,7 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useNavigate } from '@tanstack/react-router'
 import { PublicLayout } from '@/components/layout'
-import { Footer } from '@/components/layout/components/footer'
 import { PageTransition } from '@/components/page-transition'
 import { GuideArticle } from './components/guide-article'
 import { GuideSidebar } from './components/guide-sidebar'
@@ -67,7 +66,6 @@ export function UsageGuidesPage(props: UsageGuidesPageProps) {
             </div>
           </div>
         </PageTransition>
-        <Footer />
       </main>
     </PublicLayout>
   )
