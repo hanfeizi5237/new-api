@@ -138,13 +138,13 @@ export function Stats(_props: StatsProps) {
   ]
 
   return (
-    <section className='relative z-10 px-6 py-6 md:py-8'>
-      <div className='cctoken-panel-strong mx-auto max-w-7xl rounded-[2rem] px-5 py-5 md:px-8 md:py-6'>
-        <div className='grid gap-4 md:grid-cols-4 md:gap-0'>
+    <section className='relative z-10 px-6 py-1 md:py-2'>
+      <div className='cctoken-panel-strong mx-auto max-w-7xl rounded-[2rem] px-5 py-3.5 md:px-8 md:py-4.5'>
+        <div className='grid gap-3 md:grid-cols-4 md:gap-0'>
           {stats.map((stat, index) => (
             <div
               key={stat.label}
-              className={`flex items-start gap-4 rounded-[1.4rem] px-3 py-3 md:px-5 ${
+              className={`flex items-start gap-4 rounded-[1.4rem] px-3 py-2.5 md:px-5 md:py-3 ${
                 index < stats.length - 1
                   ? 'md:border-r md:border-white/8'
                   : ''
@@ -162,8 +162,8 @@ export function Stats(_props: StatsProps) {
                     decimals={stat.value.decimals}
                   />
                 </div>
-                <div className='mt-2 text-sm text-slate-200'>{stat.label}</div>
-                <div className='mt-1 text-xs tracking-[0.18em] text-slate-400 uppercase'>
+                <div className='mt-1.5 text-sm text-slate-200'>{stat.label}</div>
+                <div className='mt-0.5 text-xs tracking-[0.18em] text-slate-400 uppercase'>
                   {stat.note}
                 </div>
               </div>

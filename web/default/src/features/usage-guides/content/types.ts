@@ -39,6 +39,19 @@ export type GuideTroubleshooting = {
   content: string
 }
 
+export type GuidePricingRow = {
+  model: string
+  input: string
+  output: string
+  cacheRead: string
+}
+
+export type GuidePricing = {
+  unit: string
+  rows: GuidePricingRow[]
+  notes: string[]
+}
+
 export type UsageGuide = {
   id: GuideId
   title: string
@@ -50,6 +63,7 @@ export type UsageGuide = {
   recommendedFor: string[]
   prerequisites: string[]
   steps: GuideStep[]
+  pricing?: GuidePricing
   verification: string[]
   troubleshooting: GuideTroubleshooting[]
 }

@@ -16,11 +16,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useSystemConfig } from '@/hooks/use-system-config'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface FooterLink {
   text: string
@@ -45,6 +52,11 @@ const NEW_API_FOOTER_ATTRIBUTION_KEY = [
   'new' + 'api',
   'projectAttributionSuffix',
 ].join('.')
+
+const QQ_GROUP_IMAGE_SRC = '/contact-qq-group.png'
+const QQ_GROUP_JOIN_URL =
+  'https://qun.qq.com/universal-share/share?ac=1&authKey=FllNVYGZ1JV0Hly2M9gScVWV8lIQ0VMx5r%2FD8gJPIaWqiG627COzVRDw%2BdlZpB9r&busi_data=eyJncm91cENvZGUiOiIxMTA2MzQwNDIwIiwidG9rZW4iOiJPZHI2NTNOWWxnWG5wdzdJaXNDd3hmdXN4L1FHSzI4d3VUR3ZpTXdHZXdTZDBuKzh2TVpLQnVaenExc1k4T2VlIiwidWluIjoiMTgzNjgxNjYifQ%3D%3D&data=vu-ttWu44DC3CLx263PMR5Fu8Cr7trLv_u4uKzS2ulMWVr9zVNnlLxLd-F675SEHvrTbPRGgeIdIjwEqg1dTnA&svctype=4&tempid=h5_group_info'
+const QQ_GROUP_CODE = '1106340420'
 
 function FooterLinkItem(props: { link: FooterLink }) {
   const { t } = useTranslation()
@@ -107,6 +119,7 @@ export function Footer(props: FooterProps) {
   const displayName = systemName || props.name || 'CCToken'
   const isDemoSiteMode = Boolean(demoSiteEnabled)
   const currentYear = new Date().getFullYear()
+  const [isContactDialogOpen, setIsContactDialogOpen] = useState(false)
 
   const fallbackColumns = useMemo<FooterColumnProps[]>(
     () => [
@@ -322,19 +335,51 @@ export function Footer(props: FooterProps) {
             &copy; {currentYear} {displayName}.{' '}
             {props.copyright ?? t('footer.defaultCopyright')}
           </p>
-          <div className='flex flex-wrap items-center gap-3 text-[11px] tracking-[0.18em] text-slate-500 uppercase'>
-            <span>{t('Public brand layer')}</span>
-            <span className='text-white/18'>/</span>
-            <span>{t('Model access operations')}</span>
-            <span className='text-white/18'>/</span>
-            <span>{t('Protected attribution retained')}</span>
-          </div>
+          <button
+            type='button'
+            onClick={() => setIsContactDialogOpen(true)}
+            className='cursor-pointer text-[11px] tracking-[0.18em] text-slate-400 uppercase transition-colors duration-200 hover:text-white'
+          >
+            {t('Contact us')}
+          </button>
           <ProjectAttribution
             currentYear={currentYear}
             brandName={displayName}
           />
         </div>
       </div>
+      <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+        <DialogContent className='max-w-md rounded-[1.8rem] border border-white/10 bg-slate-950/96 p-6 text-slate-100 shadow-2xl shadow-cyan-950/30 supports-backdrop-filter:backdrop-blur-xl'>
+          <DialogHeader className='space-y-2'>
+            <DialogTitle className='text-lg font-semibold text-white'>
+              {t('Contact us')}
+            </DialogTitle>
+            <DialogDescription className='text-sm leading-6 text-slate-300'>
+              {t('Scan the QR code to join the official CCToken QQ group')}
+            </DialogDescription>
+          </DialogHeader>
+          <a
+            href={QQ_GROUP_JOIN_URL}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='group block overflow-hidden rounded-[1.5rem] border border-cyan-400/18 bg-white p-3 shadow-lg shadow-cyan-950/10 transition-transform duration-200 hover:-translate-y-0.5'
+          >
+            <img
+              src={QQ_GROUP_IMAGE_SRC}
+              alt={t('Join the CCToken QQ group')}
+              className='h-auto w-full rounded-[1rem] object-cover'
+            />
+          </a>
+          <div className='space-y-1 text-xs leading-5 text-slate-400'>
+            <p>{t('QQ group: {{code}}', { code: QQ_GROUP_CODE })}</p>
+            <p>
+              {t(
+                'Click the QR code to open the official group link in a new tab. If QQ is installed, your system may prompt you to join directly.'
+              )}
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </footer>
   )
 }

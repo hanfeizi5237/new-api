@@ -73,7 +73,7 @@ export function Hero(props: HeroProps) {
   ]
 
   return (
-    <section className='relative z-10 px-6 pt-28 pb-[4.5rem] md:pt-[8.5rem] md:pb-24'>
+    <section className='relative z-10 px-6 pt-28 pb-10 md:pt-[8.5rem] md:pb-16'>
       <div className='mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.02fr_0.98fr] lg:items-center'>
         <div className='relative'>
           <div className='landing-animate-fade-up cctoken-chip inline-flex items-center gap-2 rounded-full px-4 py-2 text-[11px] font-semibold tracking-[0.24em] uppercase text-cyan-100/86'>

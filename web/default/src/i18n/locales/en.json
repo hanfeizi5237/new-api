@@ -4604,6 +4604,11 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Contact us": "Contact us",
+    "Scan the QR code to join the official CCToken QQ group": "Scan the QR code to join the official CCToken QQ group",
+    "Join the CCToken QQ group": "Join the CCToken QQ group",
+    "QQ group: {{code}}": "QQ group: {{code}}",
+    "Click the QR code to open the official group link in a new tab. If QQ is installed, your system may prompt you to join directly.": "Click the QR code to open the official group link in a new tab. If QQ is installed, your system may prompt you to join directly."
   }
 }

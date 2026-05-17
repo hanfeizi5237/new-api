@@ -59,9 +59,9 @@ export function HowItWorks() {
   ]
 
   return (
-    <section className='relative z-10 px-6 py-[4.5rem] md:py-24'>
+    <section className='relative z-10 px-6 pt-7 pb-10 md:pt-10 md:pb-14'>
       <div className='mx-auto max-w-7xl'>
-        <AnimateInView className='mb-12 max-w-2xl'>
+        <AnimateInView className='mb-7 max-w-2xl md:mb-8'>
           <div className='inline-flex rounded-full border border-fuchsia-300/16 bg-fuchsia-300/6 px-4 py-2 text-[11px] font-semibold tracking-[0.22em] text-fuchsia-100 uppercase'>
             {t('Operating flow')}
           </div>
@@ -72,8 +72,8 @@ export function HowItWorks() {
           </h2>
         </AnimateInView>
 
-        <div className='grid gap-4 lg:grid-cols-[0.92fr_1.08fr]'>
-          <AnimateInView animation='fade-right' className='cctoken-panel-strong rounded-[2.2rem] p-6 md:p-8'>
+        <div className='grid gap-3 lg:grid-cols-[0.92fr_1.08fr] lg:gap-4'>
+          <AnimateInView animation='fade-right' className='cctoken-panel-strong rounded-[2.2rem] p-5 md:p-7'>
             <div className='flex items-center justify-between gap-4'>
               <div>
                 <div className='text-[11px] font-semibold tracking-[0.22em] text-cyan-100 uppercase'>
@@ -88,7 +88,7 @@ export function HowItWorks() {
               </div>
             </div>
 
-            <div className='mt-8 space-y-4'>
+            <div className='mt-5 space-y-3 md:mt-6'>
               {[
                 {
                   title: t('Request intake'),
@@ -108,13 +108,13 @@ export function HowItWorks() {
               ].map((item) => (
                 <div
                   key={item.title}
-                  className='rounded-[1.6rem] border border-white/8 bg-white/4 p-4'
+                  className='rounded-[1.6rem] border border-white/8 bg-white/4 p-3.5 md:p-4'
                 >
                   <div className='flex items-center gap-3'>
                     <span className={`h-2.5 w-14 rounded-full bg-gradient-to-r ${item.color}`} />
                     <span className='text-sm font-semibold text-white'>{item.title}</span>
                   </div>
-                  <p className='mt-3 text-sm leading-6 text-slate-300'>
+                  <p className='mt-2.5 text-sm leading-6 text-slate-300'>
                     {item.detail}
                   </p>
                 </div>
@@ -122,13 +122,13 @@ export function HowItWorks() {
             </div>
           </AnimateInView>
 
-          <div className='grid gap-4 sm:grid-cols-2'>
+          <div className='grid gap-3 sm:grid-cols-2 md:gap-4'>
             {steps.map((step, index) => (
               <AnimateInView
                 key={step.num}
                 delay={index * 80}
                 animation='fade-up'
-                className='cctoken-panel rounded-[2rem] p-6'
+                className='cctoken-panel rounded-[2rem] p-5 md:p-6'
               >
                 <div className='flex items-center justify-between'>
                   <div className='flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5'>
@@ -138,8 +138,8 @@ export function HowItWorks() {
                     {step.num}
                   </span>
                 </div>
-                <h3 className='mt-5 text-lg font-semibold text-white'>{step.title}</h3>
-                <p className='mt-3 text-sm leading-7 text-slate-300'>{step.desc}</p>
+                <h3 className='mt-4 text-lg font-semibold text-white'>{step.title}</h3>
+                <p className='mt-2.5 text-sm leading-7 text-slate-300'>{step.desc}</p>
               </AnimateInView>
             ))}
           </div>

@@ -4604,6 +4604,11 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Contact us": "联系我们",
+    "Scan the QR code to join the official CCToken QQ group": "扫描或点击二维码加入 CCToken 官方 QQ 群",
+    "Join the CCToken QQ group": "加入 CCToken 官方 QQ 群",
+    "QQ group: {{code}}": "QQ群：{{code}}",
+    "Click the QR code to open the official group link in a new tab. If QQ is installed, your system may prompt you to join directly.": "点击二维码会在新标签页打开官方群链接；如果本机已安装 QQ，系统可能会提示您直接加群。"
   }
 }

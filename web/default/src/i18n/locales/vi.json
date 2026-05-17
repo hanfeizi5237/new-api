@@ -4604,6 +4604,11 @@
     "Zero retention": "Không lưu dữ liệu",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Contact us": "Liên hệ với chúng tôi",
+    "Scan the QR code to join the official CCToken QQ group": "Quét mã QR để tham gia nhóm QQ chính thức của CCToken",
+    "Join the CCToken QQ group": "Tham gia nhóm QQ chính thức của CCToken",
+    "QQ group: {{code}}": "Nhóm QQ: {{code}}",
+    "Click the QR code to open the official group link in a new tab. If QQ is installed, your system may prompt you to join directly.": "Nhấp vào mã QR để mở liên kết nhóm chính thức trong tab mới. Nếu QQ đã được cài đặt, hệ thống có thể nhắc bạn tham gia trực tiếp."
   }
 }

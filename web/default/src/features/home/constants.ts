@@ -20,7 +20,12 @@ For commercial licensing, please contact support@quantumnous.com
  * Home page constants
  * All hardcoded data for home page sections
  */
-import { type TFunction } from 'i18next'
+import { type TFunction } from 'i18next';
+
+
+
+
+
 
 // Layout - Main base classes
 export const MAIN_BASE_CLASSES = 'bg-background text-foreground w-full'
@@ -62,6 +67,7 @@ export const FEATURED_MODEL_PROVIDERS = [
   'GLM',
   'Qwen',
   'MiniMax',
+  'Kimi',
 ] as const
 
 // Hero section - Gateway Features

@@ -4604,6 +4604,11 @@
     "Zero retention": "データ保持なし",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Contact us": "お問い合わせ",
+    "Scan the QR code to join the official CCToken QQ group": "QRコードをスキャンして CCToken 公式 QQ グループに参加してください",
+    "Join the CCToken QQ group": "CCToken 公式 QQ グループに参加する",
+    "QQ group: {{code}}": "QQグループ：{{code}}",
+    "Click the QR code to open the official group link in a new tab. If QQ is installed, your system may prompt you to join directly.": "QRコードをクリックすると公式グループリンクが新しいタブで開きます。QQ がインストールされている場合、システムが直接参加を促すことがあります。"
   }
 }

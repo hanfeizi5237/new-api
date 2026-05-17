@@ -23,9 +23,23 @@ import { claudeCodeGuide } from './guides/claude-code'
 import { codexCliGuide } from './guides/codex-cli'
 import { pricingUsageGuide } from './guides/pricing-usage'
 import { guideIds } from './types'
-import type { GuideId, GuideStep, GuideTroubleshooting, UsageGuide } from './types'
+import type {
+  GuideId,
+  GuidePricing,
+  GuidePricingRow,
+  GuideStep,
+  GuideTroubleshooting,
+  UsageGuide,
+} from './types'
 
-export type { GuideId, GuideStep, GuideTroubleshooting, UsageGuide }
+export type {
+  GuideId,
+  GuidePricing,
+  GuidePricingRow,
+  GuideStep,
+  GuideTroubleshooting,
+  UsageGuide,
+}
 
 export { guideIds }
 
