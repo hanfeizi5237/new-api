@@ -209,130 +209,186 @@ export function GuideArticle(props: GuideArticleProps) {
   )
 }
 
-function toPriceNumber(value: string): number {
-  return Number(value.replace(/[^\d.]/g, '')) || 0
+function getPricingProvider(model: string) {
+  if (model.startsWith('GPT')) {
+    return 'OpenAI 系列'
+  }
+  if (model.startsWith('Claude')) {
+    return 'Claude 系列'
+  }
+  if (model.startsWith('DeepSeek')) {
+    return 'DeepSeek 系列'
+  }
+  return '其他模型'
 }
 
 function PricingGuideArticle({ guide }: { guide: UsageGuide }) {
   const rows = guide.pricing?.rows ?? []
-  const inputPrices = rows.map((row) => toPriceNumber(row.input))
-  const outputPrices = rows.map((row) => toPriceNumber(row.output))
-  const cachePrices = rows.map((row) => toPriceNumber(row.cacheRead))
-
-  const maxInput = inputPrices.length > 0 ? Math.max(...inputPrices) : 0
-  const maxOutput = outputPrices.length > 0 ? Math.max(...outputPrices) : 0
-  const minCache = cachePrices.length > 0 ? Math.min(...cachePrices) : 0
+  const groupedRows = [
+    'OpenAI 系列',
+    'Claude 系列',
+    'DeepSeek 系列',
+  ]
+    .map((provider) => ({
+      provider,
+      rows: rows.filter((row) => getPricingProvider(row.model) === provider),
+    }))
+    .filter((group) => group.rows.length > 0)
 
   return (
     <article className='space-y-6'>
-      <header className='border-border/80 bg-card/80 rounded-[28px] border px-6 py-7 shadow-sm backdrop-blur-sm sm:px-8'>
-        <div className='flex flex-wrap items-center gap-2'>
-          <Badge variant='outline' className='rounded-full px-2.5'>
-            价格说明
-          </Badge>
-          {guide.tags.map((tag) => (
-            <Badge key={tag} variant='outline' className='rounded-full px-2.5'>
-              {tag}
+      <section className='grid items-start gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]'>
+        <header className='border-border/80 bg-card/80 rounded-[28px] border px-6 py-7 shadow-sm backdrop-blur-sm sm:px-8'>
+          <div className='flex flex-wrap items-center gap-2'>
+            <Badge variant='outline' className='rounded-full px-2.5'>
+              价格说明
             </Badge>
-          ))}
-        </div>
-        <h1 className='mt-4 text-3xl font-semibold tracking-tight sm:text-4xl'>
-          {guide.title}
-        </h1>
-        <p className='text-muted-foreground mt-3 max-w-4xl text-base leading-7'>
-          {guide.description}
-        </p>
-      </header>
+            {guide.tags.map((tag) => (
+              <Badge key={tag} variant='outline' className='rounded-full px-2.5'>
+                {tag}
+              </Badge>
+            ))}
+          </div>
+          <h1 className='mt-4 text-3xl font-semibold tracking-tight sm:text-4xl'>
+            {guide.title}
+          </h1>
+          <p className='text-muted-foreground mt-3 max-w-4xl text-base leading-7'>
+            {guide.description}
+          </p>
+          <p className='mt-4 max-w-4xl text-base leading-7'>
+            {guide.summary}
+          </p>
+          <div className='mt-6 grid gap-3 sm:grid-cols-3'>
+            <div className='bg-background/70 border-border/70 rounded-2xl border px-4 py-4'>
+              <div className='text-muted-foreground text-xs tracking-[0.18em] uppercase'>
+                价格单位
+              </div>
+              <div className='mt-2 text-sm leading-6'>{guide.pricing?.unit}</div>
+            </div>
+            <div className='bg-background/70 border-border/70 rounded-2xl border px-4 py-4'>
+              <div className='text-muted-foreground text-xs tracking-[0.18em] uppercase'>
+                计费维度
+              </div>
+              <div className='mt-2 text-sm leading-6'>输入、输出、缓存读</div>
+            </div>
+            <div className='bg-background/70 border-border/70 rounded-2xl border px-4 py-4'>
+              <div className='text-muted-foreground text-xs tracking-[0.18em] uppercase'>
+                覆盖模型
+              </div>
+              <div className='mt-2 text-sm leading-6'>{rows.length} 个当前可售模型</div>
+            </div>
+          </div>
+        </header>
 
-      <section className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
-        <Card className='border-border/80 bg-card/75 gap-2 rounded-2xl'>
-          <CardHeader className='pb-0'>
-            <CardDescription>覆盖模型</CardDescription>
-            <CardTitle className='text-2xl'>{rows.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className='border-border/80 bg-card/75 gap-2 rounded-2xl'>
-          <CardHeader className='pb-0'>
-            <CardDescription className='flex items-center gap-2'>
-              <Coins className='size-4' />
-              最高输入价
-            </CardDescription>
-            <CardTitle className='text-2xl'>¥{maxInput.toFixed(2)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className='border-border/80 bg-card/75 gap-2 rounded-2xl'>
-          <CardHeader className='pb-0'>
-            <CardDescription className='flex items-center gap-2'>
-              <BarChart3 className='size-4' />
-              最高输出价
-            </CardDescription>
-            <CardTitle className='text-2xl'>¥{maxOutput.toFixed(2)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className='border-border/80 bg-card/75 gap-2 rounded-2xl'>
-          <CardHeader className='pb-0'>
-            <CardDescription className='flex items-center gap-2'>
-              <Scale className='size-4' />
-              最低缓存读
-            </CardDescription>
-            <CardTitle className='text-2xl'>¥{minCache.toFixed(2)}</CardTitle>
-          </CardHeader>
-        </Card>
+        <div className='space-y-4'>
+          <Card className='border-border/80 bg-card/75 gap-0 rounded-[28px]'>
+            <CardHeader className='pb-4'>
+              <CardTitle className='flex items-center gap-2 text-lg'>
+                <Coins className='size-5' />
+                计费口径
+              </CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-3'>
+              <div className='bg-background/80 border-border/70 rounded-2xl border px-4 py-3 text-sm leading-6'>
+                输入价格：适合看长上下文、检索增强和大提示词任务的基础成本。
+              </div>
+              <div className='bg-background/80 border-border/70 rounded-2xl border px-4 py-3 text-sm leading-6'>
+                输出价格：适合看复杂推理、长回复和代码生成场景的实际放大量。
+              </div>
+              <div className='bg-background/80 border-border/70 rounded-2xl border px-4 py-3 text-sm leading-6'>
+                缓存读价格：适合看重复提示词、多轮复用和稳定模板场景的边际成本。
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className='border-border/80 bg-card/75 gap-0 rounded-[28px]'>
+            <CardHeader className='pb-4'>
+              <CardTitle className='text-lg'>适合谁看</CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-3'>
+              {guide.recommendedFor.map((item) => (
+                <div
+                  key={item}
+                  className='bg-background/80 border-border/70 rounded-2xl border px-4 py-3 text-sm leading-6'
+                >
+                  {item}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
       </section>
 
-      <Card className='border-border/80 bg-card/75 gap-0 rounded-[28px]'>
-        <CardHeader className='pb-4'>
-          <CardTitle className='text-lg'>模型定价表</CardTitle>
-          <CardDescription>{guide.pricing?.unit}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table className='rounded-2xl'>
-            <TableHeader>
-              <TableRow className='bg-muted/30'>
-                <TableHead className='h-11 pl-4 text-sm'>模型</TableHead>
-                <TableHead className='h-11 text-right text-sm'>输入</TableHead>
-                <TableHead className='h-11 text-right text-sm'>输出</TableHead>
-                <TableHead className='h-11 pr-4 text-right text-sm'>
-                  缓存读
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row, index) => (
-                <TableRow
-                  key={row.model}
-                  className={index % 2 === 0 ? 'bg-background/30' : ''}
-                >
-                  <TableCell className='py-3 pl-4 text-sm font-medium'>
-                    {row.model}
-                  </TableCell>
-                  <TableCell className='py-3 text-right font-mono text-sm'>
-                    {row.input}
-                  </TableCell>
-                  <TableCell className='py-3 text-right font-mono text-sm'>
-                    {row.output}
-                  </TableCell>
-                  <TableCell className='py-3 pr-4 text-right font-mono text-sm'>
-                    {row.cacheRead}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <section className='space-y-4'>
+        <div className='flex items-center gap-2'>
+          <BarChart3 className='size-5' />
+          <h2 className='text-xl font-semibold tracking-tight'>模型定价总览</h2>
+        </div>
+        <div className='space-y-4'>
+          {groupedRows.map((group) => (
+            <Card
+              key={group.provider}
+              className='border-border/80 bg-card/75 gap-0 rounded-[28px]'
+            >
+              <CardHeader className='pb-4'>
+                <div className='flex items-center justify-between gap-3'>
+                  <CardTitle className='text-lg'>{group.provider}</CardTitle>
+                  <Badge variant='outline' className='rounded-full px-2.5'>
+                    {group.rows.length} 个模型
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow className='bg-muted/30 hover:bg-muted/30'>
+                      <TableHead className='h-11 pl-4 text-sm'>模型</TableHead>
+                      <TableHead className='h-11 text-right text-sm'>输入</TableHead>
+                      <TableHead className='h-11 text-right text-sm'>输出</TableHead>
+                      <TableHead className='h-11 pr-4 text-right text-sm'>
+                        缓存读
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {group.rows.map((row) => (
+                      <TableRow key={row.model}>
+                        <TableCell className='py-3 pl-4 text-sm font-medium'>
+                          {row.model}
+                        </TableCell>
+                        <TableCell className='py-3 text-right font-mono text-sm'>
+                          {row.input}
+                        </TableCell>
+                        <TableCell className='py-3 text-right font-mono text-sm'>
+                          {row.output}
+                        </TableCell>
+                        <TableCell className='py-3 pr-4 text-right font-mono text-sm'>
+                          {row.cacheRead}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
 
       <section className='grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]'>
         <Card className='border-border/80 bg-card/75 gap-0 rounded-[28px]'>
           <CardHeader className='pb-4'>
-            <CardTitle className='text-lg'>用量核算方式</CardTitle>
+            <CardTitle className='flex items-center gap-2 text-lg'>
+              <Scale className='size-5' />
+              用量核算方式
+            </CardTitle>
           </CardHeader>
           <CardContent className='space-y-4'>
             <pre className='bg-muted/80 border-border/70 overflow-x-auto rounded-2xl border px-4 py-4 text-sm leading-6'>
               <code>{guide.steps[0]?.code}</code>
             </pre>
             <p className='text-muted-foreground text-sm leading-6'>
-              建议把不同业务类型拆开评估，例如对话、代码、批处理和长上下文任务，避免均值掩盖真实成本结构。
+              预算评估时建议把对话、代码、批处理、长上下文这几类任务拆开算，这样更接近真实成本。
             </p>
           </CardContent>
         </Card>
@@ -341,7 +397,7 @@ function PricingGuideArticle({ guide }: { guide: UsageGuide }) {
           <CardHeader className='pb-4'>
             <CardTitle className='flex items-center gap-2 text-lg'>
               <Sparkles className='size-5' />
-              定价解读
+              价格解读
             </CardTitle>
           </CardHeader>
           <CardContent className='space-y-3'>
