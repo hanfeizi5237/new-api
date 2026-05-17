@@ -203,20 +203,49 @@ export function Footer(props: FooterProps) {
         )}
       >
         <div className='mx-auto w-full max-w-7xl px-6 py-6'>
-          <div className='cctoken-panel flex flex-col items-center gap-4 rounded-[1.8rem] px-4 py-4 sm:flex-row sm:px-5'>
+          <div className='cctoken-panel flex flex-col items-center gap-4 rounded-[1.8rem] px-4 py-4 sm:flex-row sm:justify-between sm:px-5'>
             <div
               className='custom-footer min-w-0 text-center text-sm text-slate-300 sm:text-left'
               dangerouslySetInnerHTML={{ __html: footerHtml }}
             />
             <ContactUsButton onClick={() => setIsContactDialogOpen(true)} />
-            <div className='w-full border-t border-white/10 pt-4 sm:w-auto sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5'>
-              <ProjectAttribution
-                currentYear={currentYear}
-                brandName={displayName}
-              />
-            </div>
           </div>
         </div>
+        <Dialog
+          open={isContactDialogOpen}
+          onOpenChange={setIsContactDialogOpen}
+        >
+          <DialogContent className='max-w-md rounded-[1.8rem] border border-white/10 bg-slate-950/96 p-6 text-slate-100 shadow-2xl shadow-cyan-950/30 supports-backdrop-filter:backdrop-blur-xl'>
+            <DialogHeader className='space-y-2'>
+              <DialogTitle className='text-lg font-semibold text-white'>
+                {t('Contact us')}
+              </DialogTitle>
+              <DialogDescription className='text-sm leading-6 text-slate-300'>
+                {t('Scan the QR code to join the official CCToken QQ group')}
+              </DialogDescription>
+            </DialogHeader>
+            <a
+              href={QQ_GROUP_JOIN_URL}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='group block overflow-hidden rounded-[1.5rem] border border-cyan-400/18 bg-white p-3 shadow-lg shadow-cyan-950/10 transition-transform duration-200 hover:-translate-y-0.5'
+            >
+              <img
+                src={QQ_GROUP_IMAGE_SRC}
+                alt={t('Join the CCToken QQ group')}
+                className='h-auto w-full rounded-[1rem] object-cover'
+              />
+            </a>
+            <div className='space-y-1 text-xs leading-5 text-slate-400'>
+              <p>{t('QQ group: {{code}}', { code: QQ_GROUP_CODE })}</p>
+              <p>
+                {t(
+                  'Click the QR code to open the official group link in a new tab. If QQ is installed, your system may prompt you to join directly.'
+                )}
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
       </footer>
     )
   }

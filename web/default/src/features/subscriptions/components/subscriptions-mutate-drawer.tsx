@@ -263,7 +263,7 @@ export function SubscriptionsMutateDrawer({
                         onValueChange={(v) =>
                           field.onChange(v === '__none__' ? '' : v)
                         }
-                        value={field.value || ''}
+                        value={field.value || '__none__'}
                       >
                         <FormControl>
                           <SelectTrigger>
