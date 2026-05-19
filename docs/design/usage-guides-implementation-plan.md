@@ -19,7 +19,7 @@ Design reference: `docs/superpowers/specs/2026-05-16-usage-guides-design.md`
   - `cd web/default && bun run build`
 - Manual acceptance:
   - `/docs` renders independently
-  - all five predefined guides render and switch correctly
+  - all six predefined guides render and switch correctly
   - invalid guide values fall back cleanly
   - desktop/mobile layouts are readable
   - no historical public/authenticated route behavior is changed
@@ -162,6 +162,52 @@ Design reference: `docs/superpowers/specs/2026-05-16-usage-guides-design.md`
     - `http://127.0.0.1:4013/docs?guide=cherry-studio` renders Cherry Studio with `https://www.cctoken.fun/` and `https://www.cctoken.fun/v1`
     - top navigation no longer renders stale legacy upstream docs domains when runtime `docs_link` contains one
     - `/docs`, `/docs?guide=codex-cli`, and `/docs?guide=unknown` do not render legacy upstream docs domains or placeholder API domains
+
+### Task 8: 生图API 使用手册扩展
+
+- Status: `verified`
+- Files:
+  - `docs/superpowers/specs/2026-05-16-usage-guides-design.md`
+  - `docs/design/usage-guides-implementation-plan.md`
+  - `web/default/src/features/usage-guides/content/types.ts`
+  - `web/default/src/features/usage-guides/content/guides.ts`
+  - `web/default/src/features/usage-guides/content/guides/image-api.ts`
+  - `web/default/src/features/usage-guides/components/guide-sidebar.tsx`
+- Work:
+  - add a new docs menu entry named `生图API`
+  - paraphrase the provided image API article into a CCToken-owned guide
+  - keep all endpoint and code examples aligned to `https://www.cctoken.fun/`
+  - avoid rendering the external source link in the final docs page
+- Verification:
+  - typecheck/build pass
+  - `/docs?guide=image-api` renders with the new article
+  - sidebar and mobile selector include `生图API`
+- Source notes:
+  - source article sections confirmed on 2026-05-19:
+    - quick start
+    - minimum request body
+    - authentication
+    - request parameters
+    - size and billing
+    - fallback rules
+    - cURL / Python / JavaScript examples
+    - URL / Base64 response formats
+    - common errors
+- Result:
+  - added a new static guide entry `生图API` at `/docs?guide=image-api`
+  - added `web/default/src/features/usage-guides/content/guides/image-api.ts`
+  - aligned all rendered endpoint and code examples to `https://www.cctoken.fun/`
+  - kept the external source article as a reference only; the final docs page does not render the upstream source URL
+- Verification notes:
+  - `cd web/default && npm run typecheck` passed on 2026-05-19
+  - `cd web/default && npm run build` passed on 2026-05-19
+  - local service refreshed on port `3000`
+  - Chrome headless verification on 2026-05-19 confirmed:
+    - `/docs?guide=image-api` renders the `生图API` menu and article
+    - article body contains `https://www.cctoken.fun/v1/images/generations`
+    - article body contains `gpt-image-2` and `2K` fallback guidance
+    - rendered page does not expose `api.86gamestore.com`
+    - mobile viewport also renders the `生图API` guide successfully
 
 ## Blocking Conditions
 

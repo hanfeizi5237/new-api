@@ -1,7 +1,6 @@
 package ratio_setting
 
 import (
-	"encoding/json"
 	"errors"
 
 	"github.com/QuantumNous/new-api/common"
@@ -16,6 +15,7 @@ var defaultGroupRatio = map[string]float64{
 }
 
 var groupRatioMap = types.NewRWMap[string, float64]()
+var displayGroupRatioMap = types.NewRWMap[string, float64]()
 
 var defaultGroupGroupRatio = map[string]map[string]float64{
 	"vip": {
@@ -34,6 +34,7 @@ var defaultGroupSpecialUsableGroup = map[string]map[string]string{
 
 type GroupRatioSetting struct {
 	GroupRatio              *types.RWMap[string, float64]            `json:"group_ratio"`
+	DisplayGroupRatio       *types.RWMap[string, float64]            `json:"display_group_ratio"`
 	GroupGroupRatio         *types.RWMap[string, map[string]float64] `json:"group_group_ratio"`
 	GroupSpecialUsableGroup *types.RWMap[string, map[string]string]  `json:"group_special_usable_group"`
 }
@@ -50,6 +51,7 @@ func init() {
 	groupRatioSetting = GroupRatioSetting{
 		GroupSpecialUsableGroup: groupSpecialUsableGroup,
 		GroupRatio:              groupRatioMap,
+		DisplayGroupRatio:       displayGroupRatioMap,
 		GroupGroupRatio:         groupGroupRatioMap,
 	}
 
@@ -57,6 +59,9 @@ func init() {
 }
 
 func GetGroupRatioSetting() *GroupRatioSetting {
+	if groupRatioSetting.DisplayGroupRatio == nil {
+		groupRatioSetting.DisplayGroupRatio = types.NewRWMap[string, float64]()
+	}
 	if groupRatioSetting.GroupSpecialUsableGroup == nil {
 		groupRatioSetting.GroupSpecialUsableGroup = types.NewRWMap[string, map[string]string]()
 		groupRatioSetting.GroupSpecialUsableGroup.AddAll(defaultGroupSpecialUsableGroup)
@@ -66,6 +71,10 @@ func GetGroupRatioSetting() *GroupRatioSetting {
 
 func GetGroupRatioCopy() map[string]float64 {
 	return groupRatioMap.ReadAll()
+}
+
+func GetDisplayGroupRatioCopy() map[string]float64 {
+	return displayGroupRatioMap.ReadAll()
 }
 
 func ContainsGroupRatio(name string) bool {
@@ -81,6 +90,14 @@ func UpdateGroupRatioByJSONString(jsonStr string) error {
 	return types.LoadFromJsonString(groupRatioMap, jsonStr)
 }
 
+func DisplayGroupRatio2JSONString() string {
+	return displayGroupRatioMap.MarshalJSONString()
+}
+
+func UpdateDisplayGroupRatioByJSONString(jsonStr string) error {
+	return types.LoadFromJsonString(displayGroupRatioMap, jsonStr)
+}
+
 func GetGroupRatio(name string) float64 {
 	ratio, ok := groupRatioMap.Get(name)
 	if !ok {
@@ -88,6 +105,14 @@ func GetGroupRatio(name string) float64 {
 		return 1
 	}
 	return ratio
+}
+
+func GetDisplayGroupRatio(name string) float64 {
+	ratio, ok := displayGroupRatioMap.Get(name)
+	if ok {
+		return ratio
+	}
+	return GetGroupRatio(name)
 }
 
 func GetGroupGroupRatio(userGroup, usingGroup string) (float64, bool) {
@@ -112,13 +137,27 @@ func UpdateGroupGroupRatioByJSONString(jsonStr string) error {
 
 func CheckGroupRatio(jsonStr string) error {
 	checkGroupRatio := make(map[string]float64)
-	err := json.Unmarshal([]byte(jsonStr), &checkGroupRatio)
+	err := common.UnmarshalJsonStr(jsonStr, &checkGroupRatio)
 	if err != nil {
 		return err
 	}
 	for name, ratio := range checkGroupRatio {
 		if ratio < 0 {
 			return errors.New("group ratio must be not less than 0: " + name)
+		}
+	}
+	return nil
+}
+
+func CheckDisplayGroupRatio(jsonStr string) error {
+	checkGroupRatio := make(map[string]float64)
+	err := common.UnmarshalJsonStr(jsonStr, &checkGroupRatio)
+	if err != nil {
+		return err
+	}
+	for name, ratio := range checkGroupRatio {
+		if ratio < 0 {
+			return errors.New("display group ratio must be not less than 0: " + name)
 		}
 	}
 	return nil

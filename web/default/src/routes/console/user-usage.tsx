@@ -20,6 +20,6 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/console/user-usage')({
   beforeLoad: () => {
-    throw redirect({ to: '/dashboard/users' })
+    throw redirect({ to: '/dashboard/$section', params: { section: 'users' } })
   },
 })
