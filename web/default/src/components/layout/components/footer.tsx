@@ -414,6 +414,11 @@ export function Footer(props: FooterProps) {
           </div>
         </DialogContent>
       </Dialog>
+      <div style="display:none;">
+        <a href="https://lmspeed.net/provider/api-cctoken-fun" target="_blank">
+          <img src="https://lmspeed.net/api/provider/claim-badge/1432?claim=1432-k_d9nKqSP_IULZepnW78edNS7SQwv3jh" alt="Verified on LM Speed" />
+        </a>
+      </div>
     </footer>
   )
 }

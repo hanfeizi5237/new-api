@@ -131,15 +131,27 @@ def upgrade_newapi():
         report_lines.append('[ABORT] Pre-flight checks failed. Upgrade aborted.')
         return '\n'.join(report_lines)
 
-    # Step 1: Git pull (zhongzhuan branch)
+    # Step 1: Git pull (zhongzhuan branch) — 使用 --no-rebase 避免 divergent branches
     report_lines.append('[INFO] Fetching latest code from git...')
     run(f'cd {PROJECT_DIR} && git checkout {BRANCH}', timeout=60)
     run(f'cd {PROJECT_DIR} && git clean -fd', timeout=60)
-    rc, out, err = run(f'cd {PROJECT_DIR} && git pull origin {BRANCH}', timeout=120)
+    # 关键：用 --no-rebase 而非直接 pull，避免上游代码覆盖本地修改
+    rc, out, err = run(f'cd {PROJECT_DIR} && git fetch origin {BRANCH}', timeout=120)
     if rc == 0:
-        report_lines.append(f'[OK] Git updated on {BRANCH}: {out}')
+        # 检查本地是否有未推送的 commit（用户自定义修改）
+        rc2, local_ahead, _ = run(f'cd {PROJECT_DIR} && git rev-list --count HEAD..origin/{BRANCH}', timeout=30)
+        if rc2 == 0 and local_ahead.strip() == '0':
+            # 没有上游新代码，跳过 merge
+            report_lines.append(f'[OK] Already up to date on {BRANCH}')
+        else:
+            # 有上游更新，使用 merge（保留本地修改）而非 rebase
+            rc, out, err = run(f'cd {PROJECT_DIR} && git merge origin/{BRANCH} --no-edit', timeout=120)
+            if rc == 0:
+                report_lines.append(f'[OK] Merged upstream on {BRANCH}: {out}')
+            else:
+                report_lines.append(f'[WARN] Merge result: {out} | {err}')
     else:
-        report_lines.append(f'[WARN] Git pull result: {out} | {err}')
+        report_lines.append(f'[WARN] Git fetch result: {out} | {err}')
 
     rc, commit, _ = run(f'cd {PROJECT_DIR} && git log -1 --format="%H %s"', timeout=30)
     report_lines.append(f'Branch: {BRANCH}, Latest commit: {commit}')
