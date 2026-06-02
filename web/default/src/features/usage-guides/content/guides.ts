@@ -21,6 +21,7 @@ import { cherryStudioGuide } from './guides/cherry-studio'
 import { openclawGuide } from './guides/openclaw'
 import { claudeCodeGuide } from './guides/claude-code'
 import { codexCliGuide } from './guides/codex-cli'
+import { imageApiGuide } from './guides/image-api'
 import { pricingUsageGuide } from './guides/pricing-usage'
 import { guideIds } from './types'
 import type {
@@ -49,6 +50,7 @@ export const usageGuides: UsageGuide[] = [
   openclawGuide,
   claudeCodeGuide,
   codexCliGuide,
+  imageApiGuide,
   pricingUsageGuide,
 ]
 

@@ -22,6 +22,7 @@ export const guideIds = [
   'openclaw',
   'claude-code',
   'codex-cli',
+  'image-api',
   'pricing-usage',
 ] as const
 

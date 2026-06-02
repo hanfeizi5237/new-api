@@ -55,6 +55,7 @@ import { safeJsonParse } from '../utils/json-parser'
 
 type GroupRatioVisualEditorProps = {
   groupRatio: string
+  displayGroupRatio: string
   topupGroupRatio: string
   userUsableGroups: string
   groupGroupRatio: string
@@ -71,6 +72,7 @@ type GroupPricingRow = {
   _id: string
   name: string
   ratio: number
+  displayRatio: number
   selectable: boolean
   description: string
 }
@@ -97,22 +99,32 @@ function normalizeRatio(value: unknown): number {
 
 function buildGroupPricingRows(
   groupRatio: string,
+  displayGroupRatio: string,
   userUsableGroups: string
 ): GroupPricingRow[] {
   const ratioMap = safeJsonParse<Record<string, number>>(groupRatio, {
     fallback: {},
     context: 'group ratios',
   })
+  const displayRatioMap = safeJsonParse<Record<string, number>>(displayGroupRatio, {
+    fallback: {},
+    context: 'display group ratios',
+  })
   const usableMap = safeJsonParse<Record<string, string>>(userUsableGroups, {
     fallback: {},
     context: 'user usable groups',
   })
-  const names = new Set([...Object.keys(ratioMap), ...Object.keys(usableMap)])
+  const names = new Set([
+    ...Object.keys(ratioMap),
+    ...Object.keys(displayRatioMap),
+    ...Object.keys(usableMap),
+  ])
 
   return Array.from(names).map((name) => ({
     _id: createGroupPricingId(),
     name,
     ratio: normalizeRatio(ratioMap[name]),
+    displayRatio: normalizeRatio(displayRatioMap[name] ?? ratioMap[name]),
     selectable: Object.prototype.hasOwnProperty.call(usableMap, name),
     description: String(usableMap[name] ?? ''),
   }))
@@ -120,12 +132,14 @@ function buildGroupPricingRows(
 
 function serializeGroupPricingRows(rows: GroupPricingRow[]) {
   const groupRatio: Record<string, number> = {}
+  const displayGroupRatio: Record<string, number> = {}
   const userUsableGroups: Record<string, string> = {}
 
   for (const row of rows) {
     const name = row.name.trim()
     if (!name) continue
     groupRatio[name] = normalizeRatio(row.ratio)
+    displayGroupRatio[name] = normalizeRatio(row.displayRatio)
     if (row.selectable) {
       userUsableGroups[name] = row.description
     }
@@ -133,6 +147,7 @@ function serializeGroupPricingRows(rows: GroupPricingRow[]) {
 
   return {
     GroupRatio: JSON.stringify(groupRatio, null, 2),
+    DisplayGroupRatio: JSON.stringify(displayGroupRatio, null, 2),
     UserUsableGroups: JSON.stringify(userUsableGroups, null, 2),
   }
 }
@@ -141,6 +156,10 @@ function groupPricingSignature(rows: GroupPricingRow[]): string {
   const serialized = serializeGroupPricingRows(rows)
   return JSON.stringify({
     groupRatio: safeJsonParse(serialized.GroupRatio, {
+      fallback: {},
+      silent: true,
+    }),
+    displayGroupRatio: safeJsonParse(serialized.DisplayGroupRatio, {
       fallback: {},
       silent: true,
     }),
@@ -153,10 +172,15 @@ function groupPricingSignature(rows: GroupPricingRow[]): string {
 
 function sourceGroupPricingSignature(
   groupRatio: string,
+  displayGroupRatio: string,
   userUsableGroups: string
 ): string {
   return JSON.stringify({
     groupRatio: safeJsonParse(groupRatio, { fallback: {}, silent: true }),
+    displayGroupRatio: safeJsonParse(displayGroupRatio, {
+      fallback: {},
+      silent: true,
+    }),
     userUsableGroups: safeJsonParse(userUsableGroups, {
       fallback: {},
       silent: true,
@@ -166,6 +190,7 @@ function sourceGroupPricingSignature(
 
 export const GroupRatioVisualEditor = memo(function GroupRatioVisualEditor({
   groupRatio,
+  displayGroupRatio,
   topupGroupRatio,
   userUsableGroups,
   groupGroupRatio,
@@ -412,6 +437,7 @@ export const GroupRatioVisualEditor = memo(function GroupRatioVisualEditor({
     <div className='space-y-4'>
       <GroupPricingTable
         groupRatio={groupRatio}
+        displayGroupRatio={displayGroupRatio}
         userUsableGroups={userUsableGroups}
         onChange={onChange}
       />
@@ -752,38 +778,42 @@ export const GroupRatioVisualEditor = memo(function GroupRatioVisualEditor({
 
 type GroupPricingTableProps = {
   groupRatio: string
+  displayGroupRatio: string
   userUsableGroups: string
   onChange: (field: string, value: string) => void
 }
 
 function GroupPricingTable({
   groupRatio,
+  displayGroupRatio,
   userUsableGroups,
   onChange,
 }: GroupPricingTableProps) {
   const { t } = useTranslation()
   const [rows, setRows] = useState<GroupPricingRow[]>(() =>
-    buildGroupPricingRows(groupRatio, userUsableGroups)
+    buildGroupPricingRows(groupRatio, displayGroupRatio, userUsableGroups)
   )
 
   useEffect(() => {
     const incomingSignature = sourceGroupPricingSignature(
       groupRatio,
+      displayGroupRatio,
       userUsableGroups
     )
     setRows((currentRows) => {
       if (groupPricingSignature(currentRows) === incomingSignature) {
         return currentRows
       }
-      return buildGroupPricingRows(groupRatio, userUsableGroups)
+      return buildGroupPricingRows(groupRatio, displayGroupRatio, userUsableGroups)
     })
-  }, [groupRatio, userUsableGroups])
+  }, [groupRatio, displayGroupRatio, userUsableGroups])
 
   const emitRows = useCallback(
     (nextRows: GroupPricingRow[]) => {
       setRows(nextRows)
       const serialized = serializeGroupPricingRows(nextRows)
       onChange('GroupRatio', serialized.GroupRatio)
+      onChange('DisplayGroupRatio', serialized.DisplayGroupRatio)
       onChange('UserUsableGroups', serialized.UserUsableGroups)
     },
     [onChange]
@@ -796,7 +826,20 @@ function GroupPricingTable({
       value: string | number | boolean
     ) => {
       emitRows(
-        rows.map((row) => (row._id === id ? { ...row, [field]: value } : row))
+        rows.map((row) => {
+          if (row._id !== id) {
+            return row
+          }
+          if (field === 'ratio' && typeof value === 'number') {
+            const shouldMirrorDisplayRatio = row.displayRatio === row.ratio
+            return {
+              ...row,
+              ratio: value,
+              displayRatio: shouldMirrorDisplayRatio ? value : row.displayRatio,
+            }
+          }
+          return { ...row, [field]: value }
+        })
       )
     },
     [emitRows, rows]
@@ -816,6 +859,7 @@ function GroupPricingTable({
         _id: createGroupPricingId(),
         name,
         ratio: 1,
+        displayRatio: 1,
         selectable: true,
         description: '',
       },
@@ -849,7 +893,7 @@ function GroupPricingTable({
             <CardTitle>{t('Pricing groups')}</CardTitle>
             <CardDescription>
               {t(
-                'Edit billing ratios and user-selectable groups in one table.'
+                'Edit real ratios, display ratios, and user-selectable groups in one table.'
               )}
             </CardDescription>
           </div>
@@ -866,7 +910,8 @@ function GroupPricingTable({
               <TableHeader>
                 <TableRow>
                   <TableHead className='min-w-40'>{t('Group name')}</TableHead>
-                  <TableHead className='w-28'>{t('Ratio')}</TableHead>
+                  <TableHead className='w-28'>{t('Real Ratio')}</TableHead>
+                  <TableHead className='w-28'>{t('Display Ratio')}</TableHead>
                   <TableHead className='w-28 text-center'>
                     {t('User selectable')}
                   </TableHead>
@@ -880,7 +925,7 @@ function GroupPricingTable({
                 {rows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={6}
                       className='text-muted-foreground h-20 text-center text-sm'
                     >
                       {t('No groups yet. Add a group to get started.')}
@@ -910,6 +955,21 @@ function GroupPricingTable({
                             updateRow(
                               row._id,
                               'ratio',
+                              normalizeRatio(event.target.value)
+                            )
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type='number'
+                          min={0}
+                          step={0.1}
+                          value={String(row.displayRatio)}
+                          onChange={(event) =>
+                            updateRow(
+                              row._id,
+                              'displayRatio',
                               normalizeRatio(event.target.value)
                             )
                           }

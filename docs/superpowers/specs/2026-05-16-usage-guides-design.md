@@ -8,7 +8,7 @@ The project needs a new public usage-guide area with a documentation-style struc
 
 - Add an independent usage-guide module under `web/default`.
 - Provide a docs-like public page with a persistent left menu and static content pages.
-- Include initial guide entries for CC Switch, Cherry Studio, OpenClaw, Claude Code, and Codex CLI.
+- Include initial guide entries for CC Switch, Cherry Studio, OpenClaw, Claude Code, Codex CLI, and a public image-generation API usage guide.
 - Keep the module isolated from existing backend APIs, authenticated console features, billing, relay, and admin flows.
 - Follow the current frontend stack: React 19, TanStack Router file routes, Base UI / local UI components, Tailwind CSS, Bun scripts.
 
@@ -32,6 +32,7 @@ Initial left navigation entries:
 - OpenClaw: `/docs?guide=openclaw`
 - Claude Code: `/docs?guide=claude-code`
 - Codex CLI: `/docs?guide=codex-cli`
+- 生图API: `/docs?guide=image-api`
 
 The `/docs` route should default to the first guide or an overview section. Search params are preferred for the first iteration because they keep the module to one file-route entry and avoid route tree churn from multiple nested public pages.
 
@@ -59,6 +60,14 @@ Each guide item should include:
 - `description`
 - `sections`
 - optional `badges`, `requirements`, and `troubleshooting`
+
+For API-style guides such as the image-generation API, the same static content model may express:
+
+- endpoint and authentication basics
+- request parameter descriptions
+- supported size or billing notes
+- request/response examples
+- common error handling guidance
 
 Guide content should be written as CCToken-specific static guidance. Keep code/config snippets short, practical, and make all API site examples point to `https://www.cctoken.fun/`.
 
@@ -123,7 +132,7 @@ Automated:
 Manual:
 
 - Open `/docs` and confirm default guide renders.
-- Switch all five guide entries.
+- Switch all six guide entries.
 - Refresh with each `guide` query value.
 - Verify invalid `guide` falls back cleanly.
 - Verify desktop and mobile layouts.

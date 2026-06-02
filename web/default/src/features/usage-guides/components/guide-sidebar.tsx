@@ -22,6 +22,7 @@ import {
   Bot,
   Code2,
   ExternalLink,
+  Image,
   MonitorSmartphone,
   ReceiptText,
   Workflow,
@@ -57,6 +58,7 @@ const guideIcons: Record<
   openclaw: Bot,
   'claude-code': Wrench,
   'codex-cli': Code2,
+  'image-api': Image,
   'pricing-usage': ReceiptText,
 }
 

@@ -47,7 +47,7 @@ export const claudeCodeGuide: UsageGuide = {
       title: '设置指向 CCToken 的环境变量',
       description:
         '把 Claude Code 的基地址和鉴权令牌改成你的 CCToken 配置。实际地址请使用你的部署所提供的 Anthropic 兼容入口。',
-      code: 'export ANTHROPIC_BASE_URL="https://www.cctoken.fun/"\nexport ANTHROPIC_AUTH_TOKEN="sk-your-cctoken-key"',
+      code: 'export ANTHROPIC_BASE_URL="https://api.cctoken.fun"\nexport ANTHROPIC_AUTH_TOKEN="sk-your-cctoken-key"',
     },
     {
       title: '启动后选择可用模型',
