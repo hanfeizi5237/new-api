@@ -732,6 +732,39 @@ const USER_COLOR_FALLBACKS = [
   '#5D7092',
 ]
 
+function getUserChartBucketTimestamp(
+  timestamp: number,
+  granularity: TimeGranularity
+): number {
+  const date = new Date(timestamp * 1000)
+
+  if (granularity === 'hour') {
+    date.setMinutes(0, 0, 0)
+    return Math.floor(date.getTime() / 1000)
+  }
+
+  date.setHours(0, 0, 0, 0)
+  if (granularity === 'week') {
+    const weekday = (date.getDay() + 6) % 7
+    date.setDate(date.getDate() - weekday)
+  }
+
+  return Math.floor(date.getTime() / 1000)
+}
+
+function formatUserChartBucketLabel(
+  bucketTimestamp: number,
+  granularity: TimeGranularity
+): string {
+  if (granularity !== 'week') {
+    return formatChartTime(bucketTimestamp, granularity)
+  }
+
+  const weekStart = formatChartTime(bucketTimestamp, 'day')
+  const weekEnd = formatChartTime(bucketTimestamp + 6*24*60*60, 'day')
+  return `${weekStart} - ${weekEnd}`
+}
+
 export function processUserChartData(
   data: QuotaDataItem[],
   timeGranularity: TimeGranularity = 'day',
@@ -818,21 +851,21 @@ export function processUserChartData(
     {}
   )
 
-  const timeUserMap = new Map<string, Map<string, number>>()
-  const allTimePoints = new Set<string>()
+  const timeUserMap = new Map<number, Map<string, number>>()
+  const allTimePoints = new Set<number>()
 
   data.forEach((item) => {
     const ts = Number(item.created_at)
-    const timeKey = formatChartTime(ts, timeGranularity)
-    allTimePoints.add(timeKey)
+    const timeBucket = getUserChartBucketTimestamp(ts, timeGranularity)
+    allTimePoints.add(timeBucket)
     const user = item.username || 'unknown'
     if (!topUserSet.has(user)) return
-    if (!timeUserMap.has(timeKey)) timeUserMap.set(timeKey, new Map())
-    const map = timeUserMap.get(timeKey)!
+    if (!timeUserMap.has(timeBucket)) timeUserMap.set(timeBucket, new Map())
+    const map = timeUserMap.get(timeBucket)!
     map.set(user, (map.get(user) || 0) + (Number(item.quota) || 0))
   })
 
-  const sortedTimePoints = Array.from(allTimePoints).sort()
+  const sortedTimePoints = Array.from(allTimePoints).sort((a, b) => a - b)
   const trendValues: Array<{
     Time: string
     User: string
@@ -844,7 +877,7 @@ export function processUserChartData(
     topUsers.forEach((user) => {
       const q = timeUserMap.get(time)?.get(user) || 0
       trendValues.push({
-        Time: time,
+        Time: formatUserChartBucketLabel(time, timeGranularity),
         User: user,
         rawQuota: q,
         Usage: Number((q / quotaPerUnit).toFixed(4)),

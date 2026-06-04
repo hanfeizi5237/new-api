@@ -10,6 +10,9 @@ import (
 )
 
 func getDBType() string {
+	if common.LogSqlType != "" {
+		return common.LogSqlType
+	}
 	if common.UsingMySQL {
 		return "mysql"
 	}
@@ -86,18 +89,24 @@ func NormalizeTimestamp(ts int64, granularity string) int64 {
 
 func GetUserUsageOverview(startTimestamp, endTimestamp int64, granularity string) ([]dto.UserUsageOverview, error) {
 	type userStat struct {
-		UserID      int    `gorm:"column:user_id"`
-		Username    string `gorm:"column:username"`
-		TotalCount  int    `gorm:"column:total_count"`
-		TotalQuota  int    `gorm:"column:total_quota"`
-		TotalTokens int    `gorm:"column:total_tokens"`
+		UserID      int `gorm:"column:user_id"`
+		TotalCount  int `gorm:"column:total_count"`
+		TotalQuota  int `gorm:"column:total_quota"`
+		TotalTokens int `gorm:"column:total_tokens"`
+		ErrorCount  int `gorm:"column:error_count"`
 	}
 
 	var userStats []userStat
-	err := DB.Table("quota_data").
-		Select("user_id, username, SUM(count) as total_count, SUM(quota) as total_quota, SUM(token_used) as total_tokens").
+	err := LOG_DB.Table("logs").
+		Select(`
+			user_id,
+			SUM(CASE WHEN type = 2 THEN 1 ELSE 0 END) as total_count,
+			SUM(CASE WHEN type = 2 THEN quota ELSE 0 END) as total_quota,
+			SUM(CASE WHEN type = 2 THEN prompt_tokens + completion_tokens ELSE 0 END) as total_tokens,
+			SUM(CASE WHEN `+failureConditionSQL()+` THEN 1 ELSE 0 END) as error_count
+		`).
 		Where("created_at >= ? AND created_at <= ?", startTimestamp, endTimestamp).
-		Group("user_id, username").
+		Group("user_id").
 		Order("total_quota DESC").
 		Find(&userStats).Error
 	if err != nil {
@@ -110,34 +119,22 @@ func GetUserUsageOverview(startTimestamp, endTimestamp int64, granularity string
 	overviewMap := make(map[int]*dto.UserUsageOverview, len(userStats))
 	userIDs := make([]int, 0, len(userStats))
 	for _, us := range userStats {
+		if us.UserID <= 0 {
+			continue
+		}
+		if us.TotalCount == 0 && us.TotalQuota == 0 && us.TotalTokens == 0 && us.ErrorCount == 0 {
+			continue
+		}
 		item := &dto.UserUsageOverview{
 			UserID:      us.UserID,
-			Username:    us.Username,
 			TotalCount:  us.TotalCount,
 			TotalQuota:  us.TotalQuota,
 			TotalTokens: us.TotalTokens,
+			ErrorCount:  us.ErrorCount,
 			TimeSeries:  []dto.TimeSeriesItem{},
 		}
 		overviewMap[us.UserID] = item
 		userIDs = append(userIDs, us.UserID)
-	}
-
-	type errorStat struct {
-		UserID     int `gorm:"column:user_id"`
-		ErrorCount int `gorm:"column:error_count"`
-	}
-	var errorStats []errorStat
-	err = DB.Table("logs").
-		Select("user_id, COUNT(*) as error_count").
-		Where("user_id IN ? AND created_at >= ? AND created_at <= ? AND "+failureConditionSQL(), userIDs, startTimestamp, endTimestamp).
-		Group("user_id").
-		Find(&errorStats).Error
-	if err == nil {
-		for _, es := range errorStats {
-			if item, ok := overviewMap[es.UserID]; ok {
-				item.ErrorCount = es.ErrorCount
-			}
-		}
 	}
 
 	type seriesRow struct {
@@ -149,16 +146,22 @@ func GetUserUsageOverview(startTimestamp, endTimestamp int64, granularity string
 	}
 	normExpr := getTimestampNormExpr(granularity)
 	seriesSQL := fmt.Sprintf(`
-		SELECT user_id, %s as timestamp, SUM(count) as count, SUM(quota) as quota, SUM(token_used) as tokens
-		FROM quota_data
+		SELECT user_id, %s as timestamp,
+			SUM(CASE WHEN type = 2 THEN 1 ELSE 0 END) as count,
+			SUM(CASE WHEN type = 2 THEN quota ELSE 0 END) as quota,
+			SUM(CASE WHEN type = 2 THEN prompt_tokens + completion_tokens ELSE 0 END) as tokens
+		FROM logs
 		WHERE created_at >= ? AND created_at <= ?
 		GROUP BY user_id, %s
 		ORDER BY timestamp ASC
 	`, normExpr, normExpr)
 	var seriesRows []seriesRow
-	err = DB.Raw(seriesSQL, startTimestamp, endTimestamp).Scan(&seriesRows).Error
+	err = LOG_DB.Raw(seriesSQL, startTimestamp, endTimestamp).Scan(&seriesRows).Error
 	if err == nil {
 		for _, row := range seriesRows {
+			if row.Count == 0 && row.Quota == 0 && row.Tokens == 0 {
+				continue
+			}
 			if item, ok := overviewMap[row.UserID]; ok {
 				item.TimeSeries = append(item.TimeSeries, dto.TimeSeriesItem{Timestamp: row.Timestamp, Count: row.Count, Quota: row.Quota, Tokens: row.Tokens})
 			}
@@ -189,12 +192,12 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 		TotalUseTime int `gorm:"column:total_use_time"`
 	}
 	var summary summaryStat
-	err = DB.Table("logs").
+	err = LOG_DB.Table("logs").
 		Select(`
 			SUM(CASE WHEN type = 2 THEN 1 ELSE 0 END) as total_count,
 			SUM(CASE WHEN type = 2 THEN quota ELSE 0 END) as total_quota,
 			SUM(CASE WHEN type = 2 THEN prompt_tokens + completion_tokens ELSE 0 END) as total_tokens,
-			SUM(CASE WHEN ` + failureConditionSQL() + ` THEN 1 ELSE 0 END) as error_count,
+			SUM(CASE WHEN `+failureConditionSQL()+` THEN 1 ELSE 0 END) as error_count,
 			SUM(CASE WHEN type = 2 THEN use_time ELSE 0 END) as total_use_time
 		`).
 		Where("user_id = ? AND created_at >= ? AND created_at <= ?", userID, startTimestamp, endTimestamp).
@@ -217,14 +220,14 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 		ErrorCount       int    `gorm:"column:error_count"`
 	}
 	var modelStats []modelStat
-	err = DB.Table("logs").
+	err = LOG_DB.Table("logs").
 		Select(`
 			model_name,
 			SUM(CASE WHEN type = 2 THEN 1 ELSE 0 END) as count,
 			SUM(CASE WHEN type = 2 THEN quota ELSE 0 END) as quota,
 			SUM(CASE WHEN type = 2 THEN prompt_tokens ELSE 0 END) as prompt_tokens,
 			SUM(CASE WHEN type = 2 THEN completion_tokens ELSE 0 END) as completion_tokens,
-			SUM(CASE WHEN ` + failureConditionSQL() + ` THEN 1 ELSE 0 END) as error_count
+			SUM(CASE WHEN `+failureConditionSQL()+` THEN 1 ELSE 0 END) as error_count
 		`).
 		Where("user_id = ? AND created_at >= ? AND created_at <= ?", userID, startTimestamp, endTimestamp).
 		Group("model_name").
@@ -261,7 +264,7 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 		ORDER BY timestamp ASC
 	`, normExpr, normExpr)
 	var timeStatsRaw []timeStat
-	err = DB.Raw(timeSQL, userID, startTimestamp, endTimestamp).Scan(&timeStatsRaw).Error
+	err = LOG_DB.Raw(timeSQL, userID, startTimestamp, endTimestamp).Scan(&timeStatsRaw).Error
 	if err != nil {
 		common.SysError("查询时间分布失败: " + err.Error())
 		timeStatsRaw = []timeStat{}
@@ -277,13 +280,17 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 
 	dbType := getDBType()
 	subFunc := "SUBSTRING"
-	if dbType == "sqlite" { subFunc = "substr" }
-	if dbType == "postgres" { subFunc = "LEFT" }
+	if dbType == "sqlite" {
+		subFunc = "substr"
+	}
+	if dbType == "postgres" {
+		subFunc = "LEFT"
+	}
 	type errorStat struct {
-		ModelName string `gorm:"column:model_name"`
+		ModelName    string `gorm:"column:model_name"`
 		ErrorContent string `gorm:"column:error_content"`
-		Count int `gorm:"column:count"`
-		LatestAt int64 `gorm:"column:latest_at"`
+		Count        int    `gorm:"column:count"`
+		LatestAt     int64  `gorm:"column:latest_at"`
 	}
 	var errorSQL string
 	if dbType == "postgres" {
@@ -292,7 +299,7 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 		errorSQL = fmt.Sprintf(`SELECT model_name, %s(content, 1, 200) as error_content, COUNT(*) as count, MAX(created_at) as latest_at FROM logs WHERE user_id = ? AND created_at >= ? AND created_at <= ? AND %s GROUP BY model_name, %s(content, 1, 200) ORDER BY count DESC LIMIT 50`, subFunc, failureConditionSQL(), subFunc)
 	}
 	var errorStats []errorStat
-	err = DB.Raw(errorSQL, userID, startTimestamp, endTimestamp).Scan(&errorStats).Error
+	err = LOG_DB.Raw(errorSQL, userID, startTimestamp, endTimestamp).Scan(&errorStats).Error
 	if err != nil {
 		common.SysError("查询错误分布失败: " + err.Error())
 		errorStats = []errorStat{}
@@ -308,22 +315,24 @@ func GetUserUsageDetail(userID int, startTimestamp, endTimestamp int64, granular
 func GetTimeSeriesData(startTimestamp, endTimestamp int64, granularity string) ([]dto.TimeSeriesItem, error) {
 	normExpr := getTimestampNormExpr(granularity)
 	type timeStat struct {
-		Timestamp int64 `gorm:"column:timestamp"`
-		Count int `gorm:"column:count"`
-		Quota int `gorm:"column:quota"`
-		Tokens int `gorm:"column:tokens"`
-		TotalUseTime int `gorm:"column:total_use_time"`
+		Timestamp    int64 `gorm:"column:timestamp"`
+		Count        int   `gorm:"column:count"`
+		Quota        int   `gorm:"column:quota"`
+		Tokens       int   `gorm:"column:tokens"`
+		TotalUseTime int   `gorm:"column:total_use_time"`
 	}
-	rawSQL := fmt.Sprintf(`SELECT %s as timestamp, SUM(CASE WHEN type = 2 THEN 1 ELSE 0 END) as count, SUM(CASE WHEN type = 2 THEN quota ELSE 0 END) as quota, SUM(CASE WHEN type = 2 THEN prompt_tokens + completion_tokens ELSE 0 END) as tokens, SUM(CASE WHEN type = 2 THEN use_time ELSE 0 END) as total_use_time FROM logs WHERE created_at >= ? AND created_at <= ? GROUP BY %s ORDER BY timestamp ASC`, normExpr, normExpr)
+	rawSQL := fmt.Sprintf(`SELECT %s as timestamp, COUNT(*) as count, SUM(quota) as quota, SUM(prompt_tokens + completion_tokens) as tokens, SUM(use_time) as total_use_time FROM logs WHERE type = 2 AND created_at >= ? AND created_at <= ? GROUP BY %s ORDER BY timestamp ASC`, normExpr, normExpr)
 	var timeStats []timeStat
-	err := DB.Raw(rawSQL, startTimestamp, endTimestamp).Scan(&timeStats).Error
+	err := LOG_DB.Raw(rawSQL, startTimestamp, endTimestamp).Scan(&timeStats).Error
 	if err != nil {
 		return nil, fmt.Errorf("查询时间序列数据失败: %w", err)
 	}
 	result := make([]dto.TimeSeriesItem, 0, len(timeStats))
 	for _, ts := range timeStats {
 		avgMs := 0
-		if ts.Count > 0 { avgMs = (ts.TotalUseTime * 1000) / ts.Count }
+		if ts.Count > 0 {
+			avgMs = (ts.TotalUseTime * 1000) / ts.Count
+		}
 		result = append(result, dto.TimeSeriesItem{Timestamp: ts.Timestamp, Count: ts.Count, Quota: ts.Quota, Tokens: ts.Tokens, AvgUseMs: avgMs})
 	}
 	return result, nil
@@ -338,9 +347,9 @@ func GetTimeSeriesDataByModel(startTimestamp, endTimestamp int64, granularity st
 		Quota     int    `gorm:"column:quota"`
 		Tokens    int    `gorm:"column:tokens"`
 	}
-	rawSQL := fmt.Sprintf(`SELECT %s as timestamp, model_name, SUM(quota) as quota, SUM(token_used) as tokens FROM quota_data WHERE created_at >= ? AND created_at <= ? AND model_name != '' GROUP BY %s, model_name ORDER BY timestamp ASC`, normExpr, normExpr)
+	rawSQL := fmt.Sprintf(`SELECT %s as timestamp, model_name, SUM(quota) as quota, SUM(prompt_tokens + completion_tokens) as tokens FROM logs WHERE type = 2 AND created_at >= ? AND created_at <= ? AND model_name != '' GROUP BY %s, model_name ORDER BY timestamp ASC`, normExpr, normExpr)
 	var stats []modelTimeStat
-	err := DB.Raw(rawSQL, startTimestamp, endTimestamp).Scan(&stats).Error
+	err := LOG_DB.Raw(rawSQL, startTimestamp, endTimestamp).Scan(&stats).Error
 	if err != nil {
 		return nil, fmt.Errorf("查询按模型拆分的时间序列数据失败: %w", err)
 	}

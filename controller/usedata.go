@@ -35,6 +35,29 @@ func GetQuotaDatesByUser(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+
+	userIDs := make([]int, 0, len(dates))
+	seenUserIDs := make(map[int]struct{}, len(dates))
+	for _, item := range dates {
+		if item.UserID == 0 {
+			continue
+		}
+		if _, ok := seenUserIDs[item.UserID]; ok {
+			continue
+		}
+		seenUserIDs[item.UserID] = struct{}{}
+		userIDs = append(userIDs, item.UserID)
+	}
+
+	identityMap, err := model.GetUserIdentityMapByIds(userIDs)
+	if err == nil {
+		for _, item := range dates {
+			if user, ok := identityMap[item.UserID]; ok {
+				item.Username = user.Username
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",

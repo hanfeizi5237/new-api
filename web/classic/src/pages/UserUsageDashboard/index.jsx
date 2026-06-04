@@ -45,6 +45,7 @@ const UserUsageDashboard = () => {
     activeDetailTab,
     getSummary,
     loadOverview,
+    loadDetail,
     openUserDetail,
     closeUserDetail,
     setActiveDetailTab,
@@ -60,9 +61,7 @@ const UserUsageDashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (overviewData.length > 0) {
-      charts.updateOverviewCharts(overviewData, globalTimeSeries, globalTimeSeriesByModel);
-    }
+    charts.updateOverviewCharts(overviewData, globalTimeSeries, globalTimeSeriesByModel);
   }, [overviewData, globalTimeSeries, globalTimeSeriesByModel]);
 
   useEffect(() => {
@@ -70,6 +69,19 @@ const UserUsageDashboard = () => {
       charts.updateDetailCharts(detailData);
     }
   }, [detailData]);
+
+  useEffect(() => {
+    if (drawerVisible && selectedUser?.user_id) {
+      loadDetail(selectedUser.user_id);
+    }
+  }, [
+    drawerVisible,
+    selectedUser?.user_id,
+    dateRange.start,
+    dateRange.end,
+    granularity,
+    loadDetail,
+  ]);
 
   return (
     <div className='mt-[60px] px-2 pb-8'>

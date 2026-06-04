@@ -120,6 +120,23 @@ function ContactUsButton(props: { onClick: () => void }) {
   )
 }
 
+function HiddenLmSpeedBadge() {
+  return (
+    <div className='hidden'>
+      <a
+        href='https://lmspeed.net/provider/api-cctoken-fun'
+        target='_blank'
+        rel='noopener noreferrer'
+      >
+        <img
+          src='https://lmspeed.net/api/provider/claim-badge/1432?claim=1432-k_d9nKqSP_IULZepnW78edNS7SQwv3jh'
+          alt='Verified on LM Speed'
+        />
+      </a>
+    </div>
+  )
+}
+
 export function Footer(props: FooterProps) {
   const { t } = useTranslation()
   const {
@@ -246,6 +263,7 @@ export function Footer(props: FooterProps) {
             </div>
           </DialogContent>
         </Dialog>
+        <HiddenLmSpeedBadge />
       </footer>
     )
   }
@@ -414,11 +432,7 @@ export function Footer(props: FooterProps) {
           </div>
         </DialogContent>
       </Dialog>
-      <div style="display:none;">
-        <a href="https://lmspeed.net/provider/api-cctoken-fun" target="_blank">
-          <img src="https://lmspeed.net/api/provider/claim-badge/1432?claim=1432-k_d9nKqSP_IULZepnW78edNS7SQwv3jh" alt="Verified on LM Speed" />
-        </a>
-      </div>
+      <HiddenLmSpeedBadge />
     </footer>
   )
 }

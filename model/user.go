@@ -305,6 +305,25 @@ func GetUserById(id int, selectAll bool) (*User, error) {
 	return &user, err
 }
 
+func GetUserIdentityMapByIds(ids []int) (map[int]User, error) {
+	if len(ids) == 0 {
+		return map[int]User{}, nil
+	}
+
+	var users []User
+	if err := DB.Select("id", "username", "display_name").
+		Where("id IN ?", ids).
+		Find(&users).Error; err != nil {
+		return nil, err
+	}
+
+	result := make(map[int]User, len(users))
+	for _, user := range users {
+		result[user.Id] = user
+	}
+	return result, nil
+}
+
 func GetUserIdByAffCode(affCode string) (int, error) {
 	if affCode == "" {
 		return 0, errors.New("affCode 为空！")

@@ -150,12 +150,11 @@ export const useUserUsageData = () => {
     }
   }, [dateRange, granularity, dateRangeToTimestamps, validateDateRange]);
 
-  const openUserDetail = useCallback(async (user) => {
+  const openUserDetail = useCallback((user) => {
     setSelectedUser(user);
     setDrawerVisible(true);
     setActiveDetailTab('model');
-    await loadDetail(user.user_id);
-  }, [loadDetail]);
+  }, []);
 
   const closeUserDetail = useCallback(() => {
     setDrawerVisible(false);
@@ -180,9 +179,21 @@ export const useUserUsageData = () => {
       return;
     }
     const headers = ['用户', '调用次数', '消耗额度', 'Token 用量', '错误数'];
-    const rows = overviewData.map((user) => [user.username || `用户${user.user_id}`, user.total_count || 0, (user.total_quota / 1000000).toFixed(4), user.total_tokens || 0, user.error_count || 0]);
+    const rows = overviewData.map((user) => [
+      user.username || `用户${user.user_id}`,
+      user.total_count || 0,
+      renderQuota(user.total_quota || 0, 4),
+      user.total_tokens || 0,
+      user.error_count || 0,
+    ]);
     const summary = getSummary();
-    rows.push(['总计', summary.totalCount, (summary.totalQuota / 1000000).toFixed(4), summary.totalTokens, summary.totalErrors]);
+    rows.push([
+      '总计',
+      summary.totalCount,
+      renderQuota(summary.totalQuota || 0, 4),
+      summary.totalTokens,
+      summary.totalErrors,
+    ]);
     const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
     const bom = '\uFEFF';
     const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });

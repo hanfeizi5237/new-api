@@ -150,7 +150,15 @@ export const useUserUsageCharts = () => {
   const [specLatencyDistribution, setSpecLatencyDistribution] = useState({ type: 'bar', data: [{ id: 'latencyData', values: [] }], xField: 'Time', yField: 'Latency', seriesField: 'Metric', legends: { visible: false }, title: { visible: true, text: '平均耗时分布', subtext: '' }, color: { specified: { '平均耗时(ms)': '#f59e0b' } } });
 
   const updateOverviewCharts = useCallback((overviewData, globalTimeSeries = [], globalTimeSeriesByModel = []) => {
-    if (!overviewData || overviewData.length === 0) return;
+    if (!overviewData || overviewData.length === 0) {
+      setSpecUserRank((prev) => ({ ...prev, data: [{ id: 'userRankData', values: [] }], title: { ...prev.title, subtext: '暂无数据' } }));
+      setSpecUserTrend((prev) => ({ ...prev, data: [{ id: 'userTrendData', values: [] }], title: { ...prev.title, subtext: '暂无数据' } }));
+      setSpecCountRank((prev) => ({ ...prev, data: [{ id: 'countRankData', values: [] }], title: { ...prev.title, subtext: '暂无数据' } }));
+      setSpecErrorUserRank((prev) => ({ ...prev, data: [{ id: 'errorUserRankData', values: [] }], title: { ...prev.title, subtext: '暂无数据' } }));
+      setSpecDailyQuotaTrend((prev) => ({ ...prev, data: [{ id: 'dailyQuotaTrendData', values: [] }], color: { type: 'ordinal', range: [] } }));
+      setSpecDailyTokenTrend((prev) => ({ ...prev, data: [{ id: 'dailyTokenTrendData', values: [] }], color: { type: 'ordinal', range: [] } }));
+      return;
+    }
     const sortedByQuota = [...overviewData].sort((a, b) => (b.total_quota || 0) - (a.total_quota || 0));
     const topUsersByQuota = sortedByQuota.slice(0, 10);
     const totalQuota = sortedByQuota.reduce((s, i) => s + (i.total_quota || 0), 0);

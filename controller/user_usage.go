@@ -36,22 +36,28 @@ func GetUserUsageOverview(c *gin.Context) {
 		return
 	}
 
-	// 补充 display_name
-	userMap := make(map[int]string)
+	// 补充当前用户名与 display_name，避免历史改名导致同一用户被拆分或展示旧名。
+	userIDs := make([]int, 0, len(data))
+	seenUserIDs := make(map[int]struct{}, len(data))
 	for _, item := range data {
-		if item.UserID > 0 && userMap[item.UserID] == "" {
-			userMap[item.UserID] = ""
+		if item.UserID <= 0 {
+			continue
 		}
-	}
-	// 批量获取用户显示名
-	for userID := range userMap {
-		user, err := model.GetUserById(userID, false)
-		if err == nil {
-			userMap[userID] = user.DisplayName
+		if _, ok := seenUserIDs[item.UserID]; ok {
+			continue
 		}
+		seenUserIDs[item.UserID] = struct{}{}
+		userIDs = append(userIDs, item.UserID)
 	}
-	for i := range data {
-		data[i].DisplayName = userMap[data[i].UserID]
+
+	identityMap, err := model.GetUserIdentityMapByIds(userIDs)
+	if err == nil {
+		for i := range data {
+			if user, ok := identityMap[data[i].UserID]; ok {
+				data[i].Username = user.Username
+				data[i].DisplayName = user.DisplayName
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
