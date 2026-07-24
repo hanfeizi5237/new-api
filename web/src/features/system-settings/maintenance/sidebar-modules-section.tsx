@@ -146,6 +146,10 @@ export function SidebarModulesSection({
         title: t('Users'),
         description: t('Administer user accounts and roles.'),
       },
+      usage: {
+        title: t('User Usage'),
+        description: t('User usage analytics dashboard.'),
+      },
       setting: {
         title: t('System settings'),
         description: t('Advanced platform configuration.'),

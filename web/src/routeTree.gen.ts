@@ -50,6 +50,7 @@ import { Route as AuthenticatedSystemInfoIndexRouteImport } from './routes/_auth
 import { Route as AuthenticatedSystemSettingsIndexRouteImport } from './routes/_authenticated/system-settings/index'
 import { Route as AuthenticatedUsageLogsIndexRouteImport } from './routes/_authenticated/usage-logs/index'
 import { Route as AuthenticatedUsageLogsSectionRouteImport } from './routes/_authenticated/usage-logs/$section'
+import { Route as AuthenticatedUserUsageIndexRouteImport } from './routes/_authenticated/user-usage/index'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedWalletIndexRouteImport } from './routes/_authenticated/wallet/index'
 import { Route as PricingModelIdIndexRouteImport } from './routes/pricing/$modelId/index'
@@ -286,6 +287,12 @@ const AuthenticatedUsageLogsSectionRoute =
     path: '/usage-logs/$section',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedUserUsageIndexRoute =
+  AuthenticatedUserUsageIndexRouteImport.update({
+    id: '/user-usage/',
+    path: '/user-usage/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
@@ -427,6 +434,7 @@ export interface FileRoutesByFullPath {
   '/system-info/': typeof AuthenticatedSystemInfoIndexRoute
   '/system-settings/': typeof AuthenticatedSystemSettingsIndexRoute
   '/usage-logs/': typeof AuthenticatedUsageLogsIndexRoute
+  '/user-usage/': typeof AuthenticatedUserUsageIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
   '/wallet/': typeof AuthenticatedWalletIndexRoute
   '/pricing/$modelId/': typeof PricingModelIdIndexRoute
@@ -484,6 +492,7 @@ export interface FileRoutesByTo {
   '/system-info': typeof AuthenticatedSystemInfoIndexRoute
   '/system-settings': typeof AuthenticatedSystemSettingsIndexRoute
   '/usage-logs': typeof AuthenticatedUsageLogsIndexRoute
+  '/user-usage': typeof AuthenticatedUserUsageIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
   '/pricing/$modelId': typeof PricingModelIdIndexRoute
@@ -545,6 +554,7 @@ export interface FileRoutesById {
   '/_authenticated/system-info/': typeof AuthenticatedSystemInfoIndexRoute
   '/_authenticated/system-settings/': typeof AuthenticatedSystemSettingsIndexRoute
   '/_authenticated/usage-logs/': typeof AuthenticatedUsageLogsIndexRoute
+  '/_authenticated/user-usage/': typeof AuthenticatedUserUsageIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
   '/_authenticated/wallet/': typeof AuthenticatedWalletIndexRoute
   '/pricing/$modelId/': typeof PricingModelIdIndexRoute
@@ -605,6 +615,7 @@ export interface FileRouteTypes {
     | '/system-info/'
     | '/system-settings/'
     | '/usage-logs/'
+    | '/user-usage/'
     | '/users/'
     | '/wallet/'
     | '/pricing/$modelId/'
@@ -662,6 +673,7 @@ export interface FileRouteTypes {
     | '/system-info'
     | '/system-settings'
     | '/usage-logs'
+    | '/user-usage'
     | '/users'
     | '/wallet'
     | '/pricing/$modelId'
@@ -722,6 +734,7 @@ export interface FileRouteTypes {
     | '/_authenticated/system-info/'
     | '/_authenticated/system-settings/'
     | '/_authenticated/usage-logs/'
+    | '/_authenticated/user-usage/'
     | '/_authenticated/users/'
     | '/_authenticated/wallet/'
     | '/pricing/$modelId/'
@@ -1049,6 +1062,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedUsageLogsSectionRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/user-usage/': {
+      id: '/_authenticated/user-usage/'
+      path: '/user-usage'
+      fullPath: '/user-usage/'
+      preLoaderRoute: typeof AuthenticatedUserUsageIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/users/': {
       id: '/_authenticated/users/'
       path: '/users'
@@ -1272,6 +1292,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSubscriptionsIndexRoute: typeof AuthenticatedSubscriptionsIndexRoute
   AuthenticatedSystemInfoIndexRoute: typeof AuthenticatedSystemInfoIndexRoute
   AuthenticatedUsageLogsIndexRoute: typeof AuthenticatedUsageLogsIndexRoute
+  AuthenticatedUserUsageIndexRoute: typeof AuthenticatedUserUsageIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
   AuthenticatedWalletIndexRoute: typeof AuthenticatedWalletIndexRoute
 }
@@ -1296,6 +1317,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSubscriptionsIndexRoute: AuthenticatedSubscriptionsIndexRoute,
   AuthenticatedSystemInfoIndexRoute: AuthenticatedSystemInfoIndexRoute,
   AuthenticatedUsageLogsIndexRoute: AuthenticatedUsageLogsIndexRoute,
+  AuthenticatedUserUsageIndexRoute: AuthenticatedUserUsageIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
   AuthenticatedWalletIndexRoute: AuthenticatedWalletIndexRoute,
 }

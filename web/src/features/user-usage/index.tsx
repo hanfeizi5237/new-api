@@ -1,10 +1,10 @@
 /*
-Copyright (C) 2025 QuantumNous
+Copyright (C) 2023-2026 QuantumNous
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -12,24 +12,26 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not see <https://www.gnu.org/licenses/>.
+along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Calendar } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import React, { useEffect } from 'react';
-import { Typography } from '@douyinfe/semi-ui';
-import { Calendar } from 'lucide-react';
-import MainDashboardView from '../../components/user-usage/MainDashboardView';
-import UserDetailView from '../../components/user-usage/UserDetailView';
-import { useUserUsageData } from '../../hooks/user-usage/useUserUsageData';
-import { useUserUsageCharts } from '../../hooks/user-usage/useUserUsageCharts';
+import { MainDashboardView } from './components/main-dashboard-view'
+import { UserDetailView } from './components/user-detail-view'
+import { useUserUsageData } from './hooks/use-user-usage-data'
+import {
+  createEmptyChartSpecs,
+  updateDetailCharts,
+  updateOverviewCharts,
+} from './lib/charts'
 
-const { Text } = Typography;
-
-const UserUsageDashboard = () => {
-  const usageData = useUserUsageData();
-  const charts = useUserUsageCharts();
+export function UserUsageDashboard() {
+  const { t } = useTranslation()
+  const usageData = useUserUsageData()
 
   const {
     loading,
@@ -51,47 +53,54 @@ const UserUsageDashboard = () => {
     handleDateRangeChange,
     handleGranularityChange,
     exportCSV,
-  } = usageData;
+  } = usageData
 
-  const summary = getSummary();
+  const summary = getSummary()
 
-  useEffect(() => {
-    loadOverview();
-  }, []);
+  const baseSpecs = useMemo(() => createEmptyChartSpecs(), [])
 
-  useEffect(() => {
+  const charts = useMemo(() => {
+    let specs = baseSpecs
     if (overviewData.length > 0) {
-      charts.updateOverviewCharts(overviewData, globalTimeSeries, globalTimeSeriesByModel);
+      specs = updateOverviewCharts(
+        specs,
+        overviewData,
+        globalTimeSeries,
+        globalTimeSeriesByModel,
+      )
     }
-  }, [overviewData, globalTimeSeries, globalTimeSeriesByModel]);
+    if (detailData) {
+      specs = updateDetailCharts(specs, detailData)
+    }
+    return specs
+  }, [baseSpecs, overviewData, globalTimeSeries, globalTimeSeriesByModel, detailData])
 
   useEffect(() => {
-    if (detailData) {
-      charts.updateDetailCharts(detailData);
-    }
-  }, [detailData]);
+    loadOverview()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
-    <div className='mt-[60px] px-2 pb-8'>
-      <div className='flex items-center justify-between mb-4'>
-        <div className='flex items-center gap-2'>
-          <Calendar size={20} />
-          <Text strong size='extra-large'>用户用量看板</Text>
-        </div>
+    <div className='space-y-4 p-2 pb-8'>
+      <div className='flex items-center gap-2'>
+        <Calendar className='size-5' />
+        <span className='text-xl font-semibold'>
+          {t('User Usage Dashboard')}
+        </span>
       </div>
 
       <MainDashboardView
         loading={loading}
         overviewData={overviewData}
+        summary={summary}
         granularity={granularity}
         dateRange={dateRange}
-        summary={summary}
+        charts={charts}
         loadOverview={loadOverview}
         handleDateRangeChange={handleDateRangeChange}
         handleGranularityChange={handleGranularityChange}
         exportCSV={exportCSV}
         openUserDetail={openUserDetail}
-        charts={charts}
       />
 
       <UserDetailView
@@ -106,7 +115,5 @@ const UserUsageDashboard = () => {
         dateRange={dateRange}
       />
     </div>
-  );
-};
-
-export default UserUsageDashboard;
+  )
+}
