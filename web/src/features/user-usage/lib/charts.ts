@@ -36,7 +36,7 @@ const tokensToMillions = (tokens: number) =>
 
 export interface ChartSpecs {
   specUserRank: VChartSpec
-  specUserTrend: VChartSpec
+  specModelTrend: VChartSpec
   specCountRank: VChartSpec
   specErrorUserRank: VChartSpec
   specDailyQuotaTrend: VChartSpec
@@ -73,19 +73,19 @@ export function createEmptyChartSpecs(): ChartSpecs {
       ],
       color: { type: 'ordinal', range: USER_COLORS },
     },
-    specUserTrend: {
+    specModelTrend: {
       type: 'line',
-      data: [{ id: 'userTrendData', values: [] }],
+      data: [{ id: 'modelTrendData', values: [] }],
       xField: 'Time',
       yField: 'rawQuota',
-      seriesField: 'User',
+      seriesField: 'Model',
       legends: { visible: true, selectMode: 'single' },
-      title: { visible: true, text: 'User Usage Trend', subtext: '' },
+      title: { visible: true, text: 'Model Usage Trend', subtext: '' },
       axes: [
         { orient: 'left', label: { formatMethod: (v: number) => formatQuota(v) } },
       ],
       point: { visible: true, style: { size: 6 } },
-      color: { type: 'ordinal', range: USER_COLORS },
+      color: { type: 'ordinal', range: [] },
     },
     specCountRank: {
       type: 'bar',
@@ -365,22 +365,33 @@ export function updateOverviewCharts(
     },
   }
 
-  const trendMap = new Map<string, any>()
-  topUsersByQuota.forEach((u) => {
-    ;(u.time_series || []).forEach((point) => {
-      const key = `${point.timestamp}-${u.username}`
-      trendMap.set(key, {
-        Time: tsLabel(point.timestamp),
-        User: userLabel(u),
-        rawQuota: point.quota || 0,
+  // Build model trend line chart data from globalTimeSeriesByModel
+  const modelTrendValues: any[] = []
+  const modelTrendColors: Record<string, string> = {}
+  if (globalTimeSeriesByModel && globalTimeSeriesByModel.length > 0) {
+    const modelSet = new Set<string>()
+    globalTimeSeriesByModel.forEach((p) => {
+      const model = p.model_name || 'Unknown'
+      modelSet.add(model)
+      modelTrendValues.push({
+        Time: tsLabel(p.timestamp),
+        Model: model,
+        rawQuota: p.quota || 0,
       })
     })
-  })
+    modelSet.forEach((m) => {
+      modelTrendColors[m] = stringToColor(m)
+    })
+  }
 
-  const specUserTrend: VChartSpec = {
-    ...specs.specUserTrend,
-    data: [{ id: 'userTrendData', values: [...trendMap.values()] }],
-    title: { ...specs.specUserTrend.title, subtext: `Top ${topUsersByQuota.length} Users` },
+  const specModelTrend: VChartSpec = {
+    ...specs.specModelTrend,
+    data: [{ id: 'modelTrendData', values: modelTrendValues }],
+    color: { type: 'ordinal', range: Object.values(modelTrendColors) },
+    title: {
+      ...specs.specModelTrend.title,
+      subtext: `${Object.keys(modelTrendColors).length} Models`,
+    },
   }
 
   // Build model-level stacked bar data for daily trends
@@ -461,7 +472,7 @@ export function updateOverviewCharts(
   return {
     ...specs,
     specUserRank,
-    specUserTrend,
+    specModelTrend,
     specCountRank,
     specErrorUserRank,
     specDailyQuotaTrend,

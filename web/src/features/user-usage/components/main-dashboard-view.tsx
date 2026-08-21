@@ -174,19 +174,22 @@ export function MainDashboardView({
       </Card>
 
       {/* Stat Cards */}
-      <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5'>
+      <div className='grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5'>
         {STAT_CARDS.map((card) => {
           const Icon = card.icon
           return (
-            <Card key={card.key} className='flex items-center gap-3 p-4'>
-              <div className={cn('rounded-lg p-3', card.color)}>
-                <Icon className='size-5' />
+            <Card
+              key={card.key}
+              className='flex items-center gap-2 px-3 py-2'
+            >
+              <div className={cn('rounded-md p-1.5', card.color)}>
+                <Icon className='size-4' />
               </div>
-              <div>
-                <div className='text-muted-foreground text-xs'>
+              <div className='min-w-0'>
+                <div className='text-muted-foreground text-[11px]'>
                   {t(card.label)}
                 </div>
-                <div className='mt-1 text-xl font-semibold'>
+                <div className='truncate text-sm font-semibold sm:text-base'>
                   {summaryValues[card.key]}
                 </div>
               </div>
@@ -219,8 +222,8 @@ export function MainDashboardView({
           icon={<BarChart3 className='size-4' />}
         />
         <VChartCard
-          spec={charts.specUserTrend}
-          title={t('User Usage Trend')}
+          spec={charts.specModelTrend}
+          title={t('Model Usage Trend')}
           icon={<TrendingUp className='size-4' />}
         />
       </div>

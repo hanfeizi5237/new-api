@@ -63,6 +63,7 @@ type ErrorDistribution struct {
 type ModelTimeSeriesItem struct {
 	Timestamp int64  `json:"timestamp"`
 	ModelName string `json:"model_name"`
+	Count     int    `json:"count"`
 	Quota     int    `json:"quota"`
 	Tokens    int    `json:"tokens"`
 }

@@ -32,6 +32,7 @@ export interface TimeSeriesItem {
 export interface ModelTimeSeriesItem {
   timestamp: number
   model_name: string
+  count: number
   quota: number
   tokens: number
 }

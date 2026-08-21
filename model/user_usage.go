@@ -335,10 +335,11 @@ func GetTimeSeriesDataByModel(startTimestamp, endTimestamp int64, granularity st
 	type modelTimeStat struct {
 		Timestamp int64  `gorm:"column:timestamp"`
 		ModelName string `gorm:"column:model_name"`
+		Count     int    `gorm:"column:count"`
 		Quota     int    `gorm:"column:quota"`
 		Tokens    int    `gorm:"column:tokens"`
 	}
-	rawSQL := fmt.Sprintf(`SELECT %s as timestamp, model_name, SUM(quota) as quota, SUM(token_used) as tokens FROM quota_data WHERE created_at >= ? AND created_at <= ? AND model_name != '' GROUP BY %s, model_name ORDER BY timestamp ASC`, normExpr, normExpr)
+	rawSQL := fmt.Sprintf(`SELECT %s as timestamp, model_name, SUM(count) as count, SUM(quota) as quota, SUM(token_used) as tokens FROM quota_data WHERE created_at >= ? AND created_at <= ? AND model_name != '' GROUP BY %s, model_name ORDER BY timestamp ASC`, normExpr, normExpr)
 	var stats []modelTimeStat
 	err := DB.Raw(rawSQL, startTimestamp, endTimestamp).Scan(&stats).Error
 	if err != nil {
@@ -349,6 +350,7 @@ func GetTimeSeriesDataByModel(startTimestamp, endTimestamp int64, granularity st
 		result = append(result, dto.ModelTimeSeriesItem{
 			Timestamp: s.Timestamp,
 			ModelName: normalizeModelName(s.ModelName),
+			Count:     s.Count,
 			Quota:     s.Quota,
 			Tokens:    s.Tokens,
 		})

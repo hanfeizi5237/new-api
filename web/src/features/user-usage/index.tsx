@@ -20,6 +20,8 @@ import { Calendar } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { SectionPageLayout } from '@/components/layout'
+
 import { MainDashboardView } from './components/main-dashboard-view'
 import { UserDetailView } from './components/user-detail-view'
 import { useUserUsageData } from './hooks/use-user-usage-data'
@@ -81,39 +83,42 @@ export function UserUsageDashboard() {
   }, [])
 
   return (
-    <div className='space-y-4 p-2 pb-8'>
-      <div className='flex items-center gap-2'>
-        <Calendar className='size-5' />
-        <span className='text-xl font-semibold'>
-          {t('User Usage Dashboard')}
-        </span>
-      </div>
+    <SectionPageLayout>
+      <SectionPageLayout.Title>
+        <div className='flex items-center gap-2'>
+          <Calendar className='size-5' />
+          <span>{t('User Usage Dashboard')}</span>
+        </div>
+      </SectionPageLayout.Title>
+      <SectionPageLayout.Content>
+        <div className='space-y-4'>
+          <MainDashboardView
+            loading={loading}
+            overviewData={overviewData}
+            summary={summary}
+            granularity={granularity}
+            dateRange={dateRange}
+            charts={charts}
+            loadOverview={loadOverview}
+            handleDateRangeChange={handleDateRangeChange}
+            handleGranularityChange={handleGranularityChange}
+            exportCSV={exportCSV}
+            openUserDetail={openUserDetail}
+          />
 
-      <MainDashboardView
-        loading={loading}
-        overviewData={overviewData}
-        summary={summary}
-        granularity={granularity}
-        dateRange={dateRange}
-        charts={charts}
-        loadOverview={loadOverview}
-        handleDateRangeChange={handleDateRangeChange}
-        handleGranularityChange={handleGranularityChange}
-        exportCSV={exportCSV}
-        openUserDetail={openUserDetail}
-      />
-
-      <UserDetailView
-        drawerVisible={drawerVisible}
-        closeUserDetail={closeUserDetail}
-        detailLoading={detailLoading}
-        detailData={detailData}
-        selectedUser={selectedUser}
-        activeDetailTab={activeDetailTab}
-        setActiveDetailTab={setActiveDetailTab}
-        charts={charts}
-        dateRange={dateRange}
-      />
-    </div>
+          <UserDetailView
+            drawerVisible={drawerVisible}
+            closeUserDetail={closeUserDetail}
+            detailLoading={detailLoading}
+            detailData={detailData}
+            selectedUser={selectedUser}
+            activeDetailTab={activeDetailTab}
+            setActiveDetailTab={setActiveDetailTab}
+            charts={charts}
+            dateRange={dateRange}
+          />
+        </div>
+      </SectionPageLayout.Content>
+    </SectionPageLayout>
   )
 }
